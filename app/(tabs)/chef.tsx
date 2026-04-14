@@ -23,16 +23,19 @@ async function callChefFunction(
   history: { role: 'user' | 'model'; parts: string }[],
   pantryContext: string
 ) {
-  const res = await fetch('/api/generate-recipe', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, history, pantryContext }),
+  const { data, error } = await supabase.functions.invoke('generate-recipe', {
+    body: { message, history, pantryContext },
   });
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Chef error ${res.status}: ${errText}`);
+
+  if (error) {
+    throw new Error(`Chef error: ${error.message}`);
   }
-  return res.json();
+
+  if (!data) {
+    throw new Error('No response from Chef');
+  }
+
+  return data;
 }
 
 function uid() {
