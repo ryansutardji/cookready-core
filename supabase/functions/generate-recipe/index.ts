@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const fullSystemMessage = `${SYSTEM_PROMPT}\n\n${pantryContext ?? 'The pantry is currently empty.'}`;
 
@@ -115,8 +115,10 @@ Deno.serve(async (req: Request) => {
     );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';
+    const stack = err instanceof Error ? err.stack : undefined;
+    const name = err instanceof Error ? err.name : undefined;
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: message, name, stack }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
