@@ -21,6 +21,13 @@ const CATEGORY_ICONS: Record<string, string> = {
   Other: '📦',
 };
 
+function formatInventory(raw: string): string {
+  return raw.replace(/(\d+\.\d+)/, (_, num) => {
+    const n = parseFloat(num);
+    return Number.isInteger(n) ? String(n) : n.toFixed(1);
+  });
+}
+
 export function PantryCategory({ category }: Props) {
   const icon = CATEGORY_ICONS[category.category] ?? '📦';
 
@@ -59,7 +66,7 @@ export function PantryCategory({ category }: Props) {
               className="text-terracotta text-sm font-semibold ml-4"
               style={{ fontFamily: 'Inter_400Regular' }}
             >
-              {item.human_readable_inventory}
+              {formatInventory(item.human_readable_inventory)}
             </Text>
           </View>
         ))}
