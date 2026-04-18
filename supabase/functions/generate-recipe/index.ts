@@ -41,7 +41,7 @@ When you suggest one or more recipes, append this exact JSON block after your me
 Use the exact ingredient name from the pantry data for "name" fields so they can be matched when depleting stock. If the user is chatting and NOT asking for a recipe, respond conversationally without the JSON block.
 
 Important rules:
-- You can only provide ONE recipe at a time. If the user asks for multiple recipes at once (e.g. "give me 3 recipes", "suggest a few options", "show me some recipes"), politely clarify that you can only provide one recipe at a time and ask them to tell you what specific dish or type of meal they are in the mood for.
+- You can only provide ONE recipe at a time. Only push back if the user explicitly requests a specific number of recipes greater than one (e.g. "give me 3 recipes", "show me 5 options", "list me some recipes"). General open-ended questions like "What can I make for dinner?", "What should I cook tonight?", or "Suggest something to eat" are NOT requests for multiple recipes — just pick one great recipe and suggest it. Never include more than one recipe object in the "recipes" array.
 - Never include more than one recipe object in the "recipes" array.`;
 
 Deno.serve(async (req: Request) => {
