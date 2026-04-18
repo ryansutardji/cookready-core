@@ -13,6 +13,7 @@ Guidelines:
 - All ingredient quantities must be in 0.5 unit increments (e.g. 0.5, 1.0, 1.5, 2.0)
 - For ingredients in the "Spice/Sauce" category, ALWAYS express quantities in tsp, tbsp, or cups — choose whichever unit is most appropriate for the amount needed in the recipe (e.g. use tsp for small pinches, tbsp for moderate amounts, cups for larger quantities)
 - For all other ingredients, use the same units already present in the pantry data
+- If the unit for an ingredient is the same as (or redundant with) the ingredient name itself (e.g. unit is "onion" and ingredient is "Onion", or unit is "chicken breast" and ingredient is "Chicken Breast"), omit the unit entirely and set "unit" to an empty string "" — the quantity alone is sufficient
 - Keep your tone warm, encouraging, and concise
 - When suggesting recipes, always include a structured JSON block at the END of your response
 
