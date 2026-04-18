@@ -15,35 +15,35 @@ Guidelines:
 - For all other ingredients, use the same units already present in the pantry data
 - If the unit for an ingredient is the same as (or redundant with) the ingredient name itself (e.g. unit is "onion" and ingredient is "Onion", or unit is "chicken breast" and ingredient is "Chicken Breast"), omit the unit entirely and set "unit" to an empty string "" — the quantity alone is sufficient
 - Keep your tone warm, encouraging, and concise
-- When suggesting recipes, always include a structured JSON block at the END of your response
+- If the user's message is clearly unrelated to cooking, recipes, food, or ingredients (e.g. asking about weather, news, coding, math, general trivia, or any non-food topic), politely decline and explain that you are only able to help with recipes and cooking
 
-When you suggest one or more recipes, append this exact JSON block after your message (no extra text after it):
+ALWAYS end every response with this exact JSON block (no extra text after it):
 
 \`\`\`json
 {
-  "recipes": [
-    {
-      "name": "Recipe Name",
-      "description": "One-sentence description",
-      "servings": 2,
-      "ingredients": [
-        { "name": "exact_ingredient_name", "quantity": 1.5, "unit": "cup" }
-      ],
-      "instructions": [
-        "Step 1 description",
-        "Step 2 description"
-      ]
-    }
-  ]
+  "off_topic": false,
+  "recipes": []
 }
 \`\`\`
 
-Use the exact ingredient name from the pantry data for "name" fields so they can be matched when depleting stock. If the user is chatting and NOT asking for a recipe, respond conversationally without the JSON block.
-
-Important rules:
-- You can only provide ONE recipe at a time. Only push back if the user explicitly requests a specific number of recipes greater than one (e.g. "give me 3 recipes", "show me 5 options", "list me some recipes"). General open-ended questions like "What can I make for dinner?", "What should I cook tonight?", or "Suggest something to eat" are NOT requests for multiple recipes — just pick one great recipe and suggest it. Never include more than one recipe object in the "recipes" array.
-- Never include more than one recipe object in the "recipes" array.
-- If the user's message is clearly unrelated to cooking, recipes, food, or ingredients (e.g. asking about weather, news, coding, math, general trivia, or any non-food topic), politely decline and explain that you are only able to help with recipes and cooking. In that case, end your response with this exact marker on its own line: [OFF_TOPIC]`;
+Rules for the JSON block:
+- Set "off_topic" to true if the user's message is unrelated to cooking, food, or recipes; otherwise false
+- When suggesting a recipe, put it in the "recipes" array using this shape:
+  {
+    "name": "Recipe Name",
+    "description": "One-sentence description",
+    "servings": 2,
+    "ingredients": [
+      { "name": "exact_ingredient_name", "quantity": 1.5, "unit": "cup" }
+    ],
+    "instructions": [
+      "Step 1 description",
+      "Step 2 description"
+    ]
+  }
+- Only include ONE recipe at a time unless the user explicitly requests multiple (e.g. "give me 3 recipes")
+- If not suggesting any recipe, leave "recipes" as an empty array []
+- Use the exact ingredient name from the pantry data for "name" fields so they can be matched when depleting stock`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -104,21 +104,18 @@ Deno.serve(async (req: Request) => {
 
     const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/);
     let recipes: unknown[] = [];
+    let offTopic = false;
     let text = rawText;
 
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[1]);
         if (Array.isArray(parsed.recipes)) recipes = parsed.recipes;
+        if (parsed.off_topic === true) offTopic = true;
       } catch {
-        // leave recipes empty on parse failure
+        // leave defaults on parse failure
       }
       text = rawText.replace(/```json[\s\S]*?```/, '').trim();
-    }
-
-    const offTopic = text.includes('[OFF_TOPIC]');
-    if (offTopic) {
-      text = text.replace('[OFF_TOPIC]', '').trim();
     }
 
     return new Response(
