@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   StyleSheet,
 } from 'react-native';
@@ -61,11 +62,13 @@ export default function ChefScreen() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
+  const [showAbuseModal, setShowAbuseModal] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const TAB_BAR_HEIGHT = 52 + Math.max(insets.bottom, 8);
 
   const chatHistory = useRef<{ role: 'user' | 'model'; parts: string }[]>([]);
+  const offTopicCount = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -114,6 +117,13 @@ export default function ChefScreen() {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+
+      if (data.offTopic) {
+        offTopicCount.current += 1;
+        if (offTopicCount.current >= 3) {
+          setShowAbuseModal(true);
+        }
+      }
     } catch (err: any) {
       const errorMessage: Message = {
         id: uid(),
@@ -214,6 +224,32 @@ export default function ChefScreen() {
           ))}
         </ScrollView>
       )}
+
+      <Modal
+        visible={showAbuseModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAbuseModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalTitle, { fontFamily: 'NotoSerif_700Bold' }]}>
+              A Gentle Reminder
+            </Text>
+            <Text style={[styles.modalBody, { fontFamily: 'Inter_400Regular' }]}>
+              It looks like you've been asking me about topics outside of cooking and recipes. I'm here solely to help you discover delicious meals using your pantry ingredients. Please keep our conversation focused on food so I can be as helpful as possible.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setShowAbuseModal(false)}
+            >
+              <Text style={[styles.modalButtonText, { fontFamily: 'Inter_400Regular' }]}>
+                Understood
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <View style={[styles.inputContainer, { paddingBottom: TAB_BAR_HEIGHT + 8 }]}>
         <View style={styles.inputRow}>
@@ -396,5 +432,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  modalCard: {
+    backgroundColor: '#FFFAF5',
+    borderRadius: 20,
+    padding: 28,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    color: '#2C1810',
+    marginBottom: 12,
+  },
+  modalBody: {
+    fontSize: 14,
+    color: '#5C4033',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  modalButton: {
+    backgroundColor: '#D2691E',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

@@ -42,7 +42,8 @@ Use the exact ingredient name from the pantry data for "name" fields so they can
 
 Important rules:
 - You can only provide ONE recipe at a time. Only push back if the user explicitly requests a specific number of recipes greater than one (e.g. "give me 3 recipes", "show me 5 options", "list me some recipes"). General open-ended questions like "What can I make for dinner?", "What should I cook tonight?", or "Suggest something to eat" are NOT requests for multiple recipes — just pick one great recipe and suggest it. Never include more than one recipe object in the "recipes" array.
-- Never include more than one recipe object in the "recipes" array.`;
+- Never include more than one recipe object in the "recipes" array.
+- If the user's message is clearly unrelated to cooking, recipes, food, or ingredients (e.g. asking about weather, news, coding, math, general trivia, or any non-food topic), politely decline and explain that you are only able to help with recipes and cooking. In that case, end your response with this exact marker on its own line: [OFF_TOPIC]`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -115,8 +116,13 @@ Deno.serve(async (req: Request) => {
       text = rawText.replace(/```json[\s\S]*?```/, '').trim();
     }
 
+    const offTopic = text.includes('[OFF_TOPIC]');
+    if (offTopic) {
+      text = text.replace('[OFF_TOPIC]', '').trim();
+    }
+
     return new Response(
-      JSON.stringify({ text, recipes }),
+      JSON.stringify({ text, recipes, offTopic }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err: unknown) {
