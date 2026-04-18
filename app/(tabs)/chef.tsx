@@ -122,7 +122,22 @@ export default function ChefScreen() {
 
       setMessages((prev) => [...prev, assistantMessage]);
 
-      if (offTopic) {
+      const lowerText = responseText.toLowerCase();
+      const isOffTopic =
+        offTopic ||
+        lowerText.includes("only able to help with recipes") ||
+        lowerText.includes("only here to help with") ||
+        lowerText.includes("i can only assist with") ||
+        lowerText.includes("i'm only able to") ||
+        lowerText.includes("i can't help with that") ||
+        lowerText.includes("outside of my expertise") ||
+        lowerText.includes("i can only help with") ||
+        lowerText.includes("not something i can help") ||
+        lowerText.includes("only help with cooking") ||
+        lowerText.includes("cooking and recipes") && lowerText.includes("only") ||
+        lowerText.includes("politely decline");
+
+      if (isOffTopic) {
         offTopicCount.current += 1;
         if (offTopicCount.current >= 3) {
           setShowAbuseModal(true);
