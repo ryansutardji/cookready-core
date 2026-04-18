@@ -102,21 +102,24 @@ Deno.serve(async (req: Request) => {
     const result = await chat.sendMessage(message);
     const rawText = result.response.text();
 
-    const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/);
+    const jsonMatches = [...rawText.matchAll(/```json\s*([\s\S]*?)```/g)];
     let recipes: unknown[] = [];
     let offTopic = false;
     let text = rawText;
 
-    if (jsonMatch) {
+    for (const jsonMatch of jsonMatches) {
       try {
         const parsed = JSON.parse(jsonMatch[1]);
-        if (Array.isArray(parsed.recipes)) recipes = parsed.recipes;
-        if (parsed.off_topic === true) offTopic = true;
+        if (typeof parsed === 'object' && parsed !== null && ('off_topic' in parsed || 'recipes' in parsed)) {
+          if (Array.isArray(parsed.recipes)) recipes = parsed.recipes;
+          if (parsed.off_topic === true) offTopic = true;
+        }
       } catch {
-        // leave defaults on parse failure
+        // skip unparseable blocks
       }
-      text = rawText.replace(/```json[\s\S]*?```/, '').trim();
     }
+
+    text = rawText.replace(/```json[\s\S]*?```/g, '').trim();
 
     return new Response(
       JSON.stringify({ text, recipes, offTopic }),

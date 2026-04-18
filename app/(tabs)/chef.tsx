@@ -106,22 +106,27 @@ export default function ChefScreen() {
 
       const data = await callChefFunction(messageText, chatHistory.current, pantryContext);
 
+      const responseText: string = data.text ?? '';
+      const recipes = data.recipes ?? [];
+      const offTopic: boolean = data.offTopic === true;
+
       chatHistory.current.push({ role: 'user', parts: messageText });
-      chatHistory.current.push({ role: 'model', parts: data.text ?? '' });
+      chatHistory.current.push({ role: 'model', parts: responseText });
 
       const assistantMessage: Message = {
         id: uid(),
         role: 'assistant',
-        text: data.text ?? '',
-        recipes: data.recipes ?? [],
+        text: responseText,
+        recipes,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
 
-      if (data.offTopic) {
+      if (offTopic) {
         offTopicCount.current += 1;
         if (offTopicCount.current >= 3) {
           setShowAbuseModal(true);
+          offTopicCount.current = 0;
         }
       }
     } catch (err: any) {
