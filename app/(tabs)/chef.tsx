@@ -63,6 +63,8 @@ export default function ChefScreen() {
   const [loading, setLoading] = useState(false);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [showAbuseModal, setShowAbuseModal] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const TAB_BAR_HEIGHT = 52 + Math.max(insets.bottom, 8);
@@ -139,9 +141,12 @@ export default function ChefScreen() {
 
       if (isOffTopic) {
         offTopicCount.current += 1;
-        if (offTopicCount.current >= 3) {
+        if (offTopicCount.current === 3) {
           setShowAbuseModal(true);
-          offTopicCount.current = 0;
+        } else if (offTopicCount.current === 4) {
+          setShowWarningModal(true);
+        } else if (offTopicCount.current >= 5) {
+          setShowLogoutModal(true);
         }
       }
     } catch (err: any) {
@@ -265,6 +270,61 @@ export default function ChefScreen() {
             >
               <Text style={[styles.modalButtonText, { fontFamily: 'Inter_400Regular' }]}>
                 Understood
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showWarningModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowWarningModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalTitle, { fontFamily: 'NotoSerif_700Bold' }]}>
+              This Is Your Final Warning
+            </Text>
+            <Text style={[styles.modalBody, { fontFamily: 'Inter_400Regular' }]}>
+              You've continued to ask about things I'm not here for. I truly enjoy helping you cook wonderful meals — but if this continues, I'll have no choice but to log you out. One more off-topic message and we'll have to part ways, at least for now.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setShowWarningModal(false)}
+            >
+              <Text style={[styles.modalButtonText, { fontFamily: 'Inter_400Regular' }]}>
+                I'll Stay on Topic
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showLogoutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalTitle, { fontFamily: 'NotoSerif_700Bold' }]}>
+              Logging You Out
+            </Text>
+            <Text style={[styles.modalBody, { fontFamily: 'Inter_400Regular' }]}>
+              It seems our kitchen wasn't the right fit today. You've been logged out due to repeated misuse of the AI Chef. We hope to welcome you back when you're ready to cook something wonderful.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={async () => {
+                setShowLogoutModal(false);
+                await supabase.auth.signOut();
+              }}
+            >
+              <Text style={[styles.modalButtonText, { fontFamily: 'Inter_400Regular' }]}>
+                OK
               </Text>
             </TouchableOpacity>
           </View>
