@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Send, Sparkles } from 'lucide-react-native';
+import { Send } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import type { PantryItem } from '@/lib/supabase';
 import { ChatMessage } from '@/components/ChatMessage';
@@ -157,12 +157,6 @@ export default function ChefScreen() {
               </Text>
             </View>
           </View>
-          <View style={styles.badge}>
-            <Sparkles size={12} color="#D2691E" />
-            <Text style={[styles.badgeText, { fontFamily: 'Inter_400Regular' }]}>
-              Gemini
-            </Text>
-          </View>
         </View>
       </View>
 
@@ -296,21 +290,6 @@ const styles = StyleSheet.create({
   statusText: {
     color: '#7A9E7E',
     fontSize: 12,
-  },
-  badge: {
-    marginLeft: 'auto',
-    backgroundColor: 'rgba(210,105,30,0.1)',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  badgeText: {
-    color: '#D2691E',
-    fontSize: 12,
-    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
