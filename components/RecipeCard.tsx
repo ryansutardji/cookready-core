@@ -90,7 +90,12 @@ export function RecipeCard({ recipe, onCooked }: Props) {
                   className="text-espresso text-sm"
                   style={{ fontFamily: 'Inter_400Regular' }}
                 >
-                  {ing.quantity} {ing.unit} {ing.name}
+                  {ing.quantity}{(() => {
+                    const unit = (ing.unit ?? '').trim().toLowerCase();
+                    const name = (ing.name ?? '').trim().toLowerCase();
+                    if (!unit || name.includes(unit) || unit.includes(name)) return '';
+                    return ` ${ing.unit}`;
+                  })()} {ing.name}
                 </Text>
               </View>
             ))}
