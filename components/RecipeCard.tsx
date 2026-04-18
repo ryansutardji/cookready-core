@@ -95,7 +95,10 @@ export function RecipeCard({ recipe, onCooked }: Props) {
                     const name = (ing.name ?? '').trim().toLowerCase();
                     if (!unit || name.includes(unit) || unit.includes(name)) return '';
                     return ` ${ing.unit}`;
-                  })()} {ing.name}
+                  })()} {(() => {
+                    const name = (ing.name ?? '').trim();
+                    return name.replace(/s$/i, '');
+                  })()}
                 </Text>
               </View>
             ))}
