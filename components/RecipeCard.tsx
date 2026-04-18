@@ -11,6 +11,10 @@ type Props = {
 
 type CookState = 'idle' | 'cooking' | 'success' | 'error';
 
+function formatQuantity(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 export function RecipeCard({ recipe, onCooked }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [cookState, setCookState] = useState<CookState>('idle');
@@ -90,7 +94,7 @@ export function RecipeCard({ recipe, onCooked }: Props) {
                   className="text-espresso text-sm"
                   style={{ fontFamily: 'Inter_400Regular' }}
                 >
-                  {ing.quantity}{(() => {
+                  {formatQuantity(ing.quantity)}{(() => {
                     const unit = (ing.unit ?? '').trim().toLowerCase();
                     const name = (ing.name ?? '').trim().toLowerCase();
                     if (!unit || name.includes(unit) || unit.includes(name)) return '';
