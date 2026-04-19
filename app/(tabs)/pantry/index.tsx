@@ -44,19 +44,44 @@ export default function PantryScreen() {
 
       const { data, error: err } = await supabase
         .from('user_pantry')
-        .select('id, current_quantity_value, ingredients(name, category, preferred_unit)')
+        .select(`
+          id,
+          current_quantity_value,
+          ingredients(
+            id,
+            name,
+            category,
+            preferred_unit,
+            unit_conversions(input_unit, output_value, output_unit)
+          )
+        `)
         .order('id');
 
       if (err) throw err;
 
-      const mapped: PantryItem[] = (data ?? []).map((row: any) => ({
-        id: row.id,
-        name: row.ingredients?.name ?? '',
-        category: row.ingredients?.category ?? 'Other',
-        quantity: row.current_quantity_value ?? 0,
-        unit: row.ingredients?.preferred_unit ?? '',
-        human_readable_inventory: `${row.current_quantity_value ?? 0} ${row.ingredients?.preferred_unit ?? ''}`.trim(),
-      }));
+      const mapped: PantryItem[] = (data ?? []).map((row: any) => {
+        const ing = row.ingredients ?? {};
+        const preferredUnit: string = ing.preferred_unit ?? '';
+        const baseQty: number = parseFloat(row.current_quantity_value ?? '0');
+
+        const conversions: any[] = ing.unit_conversions ?? [];
+        const conv = conversions.find((c: any) => c.input_unit === preferredUnit);
+        const displayQty = conv && conv.output_value
+          ? baseQty / parseFloat(conv.output_value)
+          : baseQty;
+
+        const rounded = Number.isInteger(displayQty) ? displayQty : parseFloat(displayQty.toFixed(1));
+
+        return {
+          id: row.id,
+          name: ing.name ?? '',
+          category: ing.category ?? 'Other',
+          quantity: rounded,
+          unit: preferredUnit,
+          human_readable_inventory: `${rounded} ${preferredUnit}`.trim(),
+          conversionFactor: conv ? parseFloat(conv.output_value) : undefined,
+        };
+      });
 
       setCategories(groupByCategory(mapped));
     } catch (err: any) {
@@ -92,6 +117,7 @@ export default function PantryScreen() {
         quantity: String(item.quantity),
         unit: item.unit,
         category: item.category,
+        conversionFactor: String(item.conversionFactor ?? ''),
       },
     });
   }

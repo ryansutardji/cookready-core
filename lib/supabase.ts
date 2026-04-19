@@ -19,6 +19,7 @@ export type PantryItem = {
   quantity: number;
   unit: string;
   human_readable_inventory: string;
+  conversionFactor?: number;
 };
 
 export type PantryCategory = {

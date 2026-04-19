@@ -22,6 +22,7 @@ export default function EditItemScreen() {
     quantity: string;
     unit: string;
     category: string;
+    conversionFactor: string;
   }>();
 
   const [quantity, setQuantity] = useState(parseFloat(params.quantity ?? '0'));
@@ -67,9 +68,11 @@ export default function EditItemScreen() {
     setError('');
     setSaving(true);
     try {
+      const factor = parseFloat(params.conversionFactor ?? '0');
+      const baseQuantity = factor > 0 ? quantity * factor : quantity;
       const { error: err } = await supabase
         .from('user_pantry')
-        .update({ current_quantity_value: quantity, last_updated: new Date().toISOString() })
+        .update({ current_quantity_value: baseQuantity, last_updated: new Date().toISOString() })
         .eq('id', params.id);
       if (err) throw err;
       router.back();
