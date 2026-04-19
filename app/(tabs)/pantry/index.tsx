@@ -43,12 +43,22 @@ export default function PantryScreen() {
       if (user?.email) setUserEmail(user.email);
 
       const { data, error: err } = await supabase
-        .from('pantry_items')
-        .select('id, name, category, quantity, unit, human_readable_inventory')
-        .order('name');
+        .from('user_pantry')
+        .select('id, current_quantity_value, ingredients(name, category, preferred_unit)')
+        .order('id');
 
       if (err) throw err;
-      setCategories(groupByCategory((data as PantryItem[]) ?? []));
+
+      const mapped: PantryItem[] = (data ?? []).map((row: any) => ({
+        id: row.id,
+        name: row.ingredients?.name ?? '',
+        category: row.ingredients?.category ?? 'Other',
+        quantity: row.current_quantity_value ?? 0,
+        unit: row.ingredients?.preferred_unit ?? '',
+        human_readable_inventory: `${row.current_quantity_value ?? 0} ${row.ingredients?.preferred_unit ?? ''}`.trim(),
+      }));
+
+      setCategories(groupByCategory(mapped));
     } catch (err: any) {
       setError(err.message ?? 'Failed to load pantry.');
     } finally {

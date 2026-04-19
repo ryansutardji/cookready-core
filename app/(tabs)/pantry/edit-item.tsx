@@ -67,10 +67,9 @@ export default function EditItemScreen() {
     setError('');
     setSaving(true);
     try {
-      const human_readable_inventory = buildReadable(quantity, unit);
       const { error: err } = await supabase
-        .from('pantry_items')
-        .update({ quantity, human_readable_inventory, updated_at: new Date().toISOString() })
+        .from('user_pantry')
+        .update({ current_quantity_value: quantity, last_updated: new Date().toISOString() })
         .eq('id', params.id);
       if (err) throw err;
       router.back();
@@ -86,7 +85,7 @@ export default function EditItemScreen() {
     setDeleting(true);
     try {
       const { error: err } = await supabase
-        .from('pantry_items')
+        .from('user_pantry')
         .delete()
         .eq('id', params.id);
       if (err) throw err;
