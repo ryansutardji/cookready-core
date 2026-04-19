@@ -12,6 +12,7 @@ import { LogOut, RefreshCw } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import type { PantryItem, PantryCategory as PantryCategoryType } from '@/lib/supabase';
 import { PantryCategory } from '@/components/PantryCategory';
+import { SmartAddBar } from '@/components/SmartAddBar';
 
 function groupByCategory(items: PantryItem[]): PantryCategoryType[] {
   const map: Record<string, PantryItem[]> = {};
@@ -146,6 +147,8 @@ export default function PantryScreen() {
           </View>
         )}
       </View>
+
+      <SmartAddBar onItemAdded={fetchPantry} />
 
       {loading && !refreshing ? (
         <View className="flex-1 items-center justify-center gap-3">
