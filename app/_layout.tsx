@@ -49,7 +49,7 @@ export default function RootLayout() {
     if (!authReady || (!fontsLoaded && !fontError)) return;
 
     if (session) {
-      router.replace('/(tabs)');
+      router.replace('/(tabs)/pantry');
     } else {
       router.replace('/(auth)');
     }
