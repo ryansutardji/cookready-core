@@ -8,6 +8,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { LogOut, RefreshCw } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import type { PantryItem, PantryCategory as PantryCategoryType } from '@/lib/supabase';
@@ -26,6 +27,7 @@ function groupByCategory(items: PantryItem[]): PantryCategoryType[] {
 }
 
 export default function PantryScreen() {
+  const router = useRouter();
   const [categories, setCategories] = useState<PantryCategoryType[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,8 +43,9 @@ export default function PantryScreen() {
       if (user?.email) setUserEmail(user.email);
 
       const { data, error: err } = await supabase
-        .from('ai_pantry_snapshot')
-        .select('name, category, human_readable_inventory');
+        .from('pantry_items')
+        .select('id, name, category, quantity, unit, human_readable_inventory')
+        .order('name');
 
       if (err) throw err;
       setCategories(groupByCategory((data as PantryItem[]) ?? []));
@@ -68,6 +71,19 @@ export default function PantryScreen() {
   function handleRefresh() {
     setRefreshing(true);
     fetchPantry();
+  }
+
+  function handleItemPress(item: PantryItem) {
+    router.push({
+      pathname: '/(tabs)/pantry/edit-item',
+      params: {
+        id: item.id,
+        name: item.name,
+        quantity: String(item.quantity),
+        unit: item.unit,
+        category: item.category,
+      },
+    });
   }
 
   const totalItems = categories.reduce((sum, c) => sum + c.items.length, 0);
@@ -208,7 +224,7 @@ export default function PantryScreen() {
           }
         >
           {categories.map((cat) => (
-            <PantryCategory key={cat.category} category={cat} />
+            <PantryCategory key={cat.category} category={cat} onItemPress={handleItemPress} />
           ))}
         </ScrollView>
       )}

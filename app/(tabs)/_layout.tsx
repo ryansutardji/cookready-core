@@ -68,7 +68,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="pantry"
         options={{
           title: 'Pantry',
           tabBarIcon: ({ size, color }) => (
