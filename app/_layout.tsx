@@ -1,6 +1,6 @@
 import '../global.css';
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Stack, useNavigationContainerRef } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { NotoSerif_700Bold } from '@expo-google-fonts/noto-serif';
@@ -15,6 +15,9 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   useFrameworkReady();
 
+  const navigationRef = useNavigationContainerRef();
+  const [isNavigationReady, setIsNavigationReady] = useState(false);
+
   const [fontsLoaded, fontError] = useFonts({
     NotoSerif_700Bold,
     Inter_400Regular,
@@ -26,14 +29,21 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
+  useEffect(() => {
+    const unsubscribe = navigationRef.addListener('state', () => {
+      setIsNavigationReady(true);
+    });
+    return unsubscribe;
+  }, [navigationRef]);
+
   if (!fontsLoaded && !fontError) {
     return null;
   }
 
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <Stack screenOptions={{ headerShown: false }}>
+      <AuthProvider navigationReady={isNavigationReady}>
+        <Stack ref={navigationRef} screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />

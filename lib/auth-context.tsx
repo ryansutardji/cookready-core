@@ -8,7 +8,13 @@ const AuthContext = createContext<AuthContextType>({ session: null, ready: false
 
 export const useAuth = () => useContext(AuthContext);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({
+  children,
+  navigationReady,
+}: {
+  children: ReactNode;
+  navigationReady: boolean;
+}) {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   useEffect(() => {
@@ -19,15 +25,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setTimeout(() => {
-        setSession(newSession);
-      }, 0);
+      setSession(newSession);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const ready = session !== undefined;
+  const ready = session !== undefined && navigationReady;
 
   return (
     <AuthContext.Provider value={{ session: session ?? null, ready }}>
