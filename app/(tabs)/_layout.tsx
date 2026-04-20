@@ -1,5 +1,5 @@
 import { Tabs, Redirect } from 'expo-router';
-import { useAuth } from '@/app/_layout';
+import { useAuth } from '@/lib/auth-context';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { ShoppingBasket, ChefHat } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
