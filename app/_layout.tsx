@@ -1,8 +1,7 @@
 import '../global.css';
 import { useEffect, useState, createContext, useContext } from 'react';
-import { Stack, router, useRootNavigationState } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator } from 'react-native';
 import { useFonts } from 'expo-font';
 import { NotoSerif_700Bold } from '@expo-google-fonts/noto-serif';
 import { Inter_400Regular } from '@expo-google-fonts/inter';
@@ -21,7 +20,6 @@ export default function RootLayout() {
   useFrameworkReady();
 
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const navigationState = useRootNavigationState();
 
   const [fontsLoaded, fontError] = useFonts({
     NotoSerif_700Bold,
@@ -44,7 +42,6 @@ export default function RootLayout() {
 
   const fontsReady = fontsLoaded || !!fontError;
   const authReady = session !== undefined;
-  const navReady = !!navigationState?.key;
   const ready = fontsReady && authReady;
 
   useEffect(() => {
@@ -53,34 +50,10 @@ export default function RootLayout() {
     }
   }, [ready]);
 
-  useEffect(() => {
-    if (!ready || !navReady) return;
-
-    if (session) {
-      router.replace('/(tabs)/pantry');
-    } else {
-      router.replace('/(auth)');
-    }
-  }, [ready, navReady, session]);
-
-  if (!ready) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: '#FFFAF5',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <ActivityIndicator color="#D2691E" />
-      </View>
-    );
-  }
-
   return (
     <AuthContext.Provider value={{ session: session ?? null, ready }}>
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="+not-found" />
