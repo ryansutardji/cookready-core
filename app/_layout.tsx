@@ -55,20 +55,7 @@ export default function RootLayout() {
     }
   }, [session, authReady, fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: '#FFFAF5',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <ActivityIndicator color="#D2691E" />
-      </View>
-    );
-  }
+  const isReady = (fontsLoaded || !!fontError) && authReady;
 
   return (
     <>
@@ -78,6 +65,22 @@ export default function RootLayout() {
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="dark" />
+      {!isReady && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: '#FFFAF5',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <ActivityIndicator color="#D2691E" />
+        </View>
+      )}
     </>
   );
 }
