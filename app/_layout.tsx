@@ -1,6 +1,7 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
-import { Stack, router } from 'expo-router';
+// 1. Added useRootNavigationState to the imports
+import { Stack, useRouter, useRootNavigationState } from 'expo-router'; 
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import { useFonts } from 'expo-font';
@@ -15,6 +16,10 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useFrameworkReady();
+  const router = useRouter();
+  
+  // 2. Initialize the navigation state hook
+  const navigationState = useRootNavigationState();
 
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -45,7 +50,12 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError, authReady]);
 
+  // 3. UPDATED EFFECT: The actual routing logic
   useEffect(() => {
+    // CRITICAL GUARD: If navigationState?.key doesn't exist, the router isn't ready.
+    // If we try to replace now, Expo Go will crash.
+    if (!navigationState?.key) return;
+
     if (!authReady || (!fontsLoaded && !fontError)) return;
 
     if (session) {
@@ -53,7 +63,8 @@ export default function RootLayout() {
     } else {
       router.replace('/(auth)');
     }
-  }, [session, authReady, fontsLoaded, fontError]);
+    // Added navigationState?.key to the dependency array
+  }, [session, authReady, fontsLoaded, fontError, navigationState?.key]);
 
   const isReady = (fontsLoaded || !!fontError) && authReady;
 
@@ -65,6 +76,8 @@ export default function RootLayout() {
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="dark" />
+      
+      {/* Keeping the overlay fix Bolt provided, as it is good practice */}
       {!isReady && (
         <View
           style={{
