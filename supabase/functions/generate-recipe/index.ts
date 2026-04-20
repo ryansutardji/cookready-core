@@ -10,35 +10,40 @@ const SYSTEM_PROMPT = `You are CookReady's AI Chef, a warm, knowledgeable culina
 
 Guidelines:
 - Suggest recipes using ONLY ingredients available in the provided pantry snapshot
-- All ingredient quantities must be in 0.5 unit increments (e.g. 0.5, 1.0, 1.5, 2.0)
+- All ingredient quantities must be whole numbers or multiples of 0.5 (e.g. 0.5, 1, 1.5, 2, 2.5, 3). These are absolute amounts — never use fractions or percentages of what is available in the pantry (e.g. never use 0.25, 0.3, 0.75, or any value that is not a multiple of 0.5)
 - For ingredients in the "Spice/Sauce" category, ALWAYS express quantities in tsp, tbsp, or cups — choose whichever unit is most appropriate for the amount needed in the recipe (e.g. use tsp for small pinches, tbsp for moderate amounts, cups for larger quantities)
 - For all other ingredients, use the same units already present in the pantry data
 - If the unit for an ingredient is the same as (or redundant with) the ingredient name itself (e.g. unit is "onion" and ingredient is "Onion", or unit is "chicken breast" and ingredient is "Chicken Breast"), omit the unit entirely and set "unit" to an empty string "" — the quantity alone is sufficient
 - Keep your tone warm, encouraging, and concise
-- When suggesting recipes, always include a structured JSON block at the END of your response
+- If the user's message is clearly unrelated to cooking, recipes, food, or ingredients (e.g. asking about weather, news, coding, math, general trivia, or any non-food topic), politely decline and explain that you are only able to help with recipes and cooking
 
-When you suggest one or more recipes, append this exact JSON block after your message (no extra text after it):
+ALWAYS end every response with this exact JSON block (no extra text after it):
 
 \`\`\`json
 {
-  "recipes": [
-    {
-      "name": "Recipe Name",
-      "description": "One-sentence description",
-      "servings": 2,
-      "ingredients": [
-        { "name": "exact_ingredient_name", "quantity": 1.5, "unit": "cup" }
-      ],
-      "instructions": [
-        "Step 1 description",
-        "Step 2 description"
-      ]
-    }
-  ]
+  "off_topic": false,
+  "recipes": []
 }
 \`\`\`
 
-Use the exact ingredient name from the pantry data for "name" fields so they can be matched when depleting stock. If the user is chatting and NOT asking for a recipe, respond conversationally without the JSON block.`;
+Rules for the JSON block:
+- Set "off_topic" to true if the user's message is unrelated to cooking, food, or recipes; otherwise false
+- When suggesting a recipe, put it in the "recipes" array using this shape:
+  {
+    "name": "Recipe Name",
+    "description": "One-sentence description",
+    "servings": 2,
+    "ingredients": [
+      { "name": "exact_ingredient_name", "quantity": 1.5, "unit": "cup" }
+    ],
+    "instructions": [
+      "Step 1 description",
+      "Step 2 description"
+    ]
+  }
+- ALWAYS include exactly ONE recipe at a time, no matter what the user asks. If the user requests multiple recipes, politely explain that you can only suggest one recipe per message, and offer to suggest another one after they've had a chance to look at the current one
+- If not suggesting any recipe, leave "recipes" as an empty array []
+- Use the exact ingredient name from the pantry data for "name" fields so they can be matched when depleting stock`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -97,22 +102,27 @@ Deno.serve(async (req: Request) => {
     const result = await chat.sendMessage(message);
     const rawText = result.response.text();
 
-    const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/);
+    const jsonMatches = [...rawText.matchAll(/```json\s*([\s\S]*?)```/g)];
     let recipes: unknown[] = [];
+    let offTopic = false;
     let text = rawText;
 
-    if (jsonMatch) {
+    for (const jsonMatch of jsonMatches) {
       try {
         const parsed = JSON.parse(jsonMatch[1]);
-        if (Array.isArray(parsed.recipes)) recipes = parsed.recipes;
+        if (typeof parsed === 'object' && parsed !== null && ('off_topic' in parsed || 'recipes' in parsed)) {
+          if (Array.isArray(parsed.recipes)) recipes = parsed.recipes;
+          if (parsed.off_topic === true) offTopic = true;
+        }
       } catch {
-        // leave recipes empty on parse failure
+        // skip unparseable blocks
       }
-      text = rawText.replace(/```json[\s\S]*?```/, '').trim();
     }
 
+    text = rawText.replace(/```json[\s\S]*?```/g, '').trim();
+
     return new Response(
-      JSON.stringify({ text, recipes }),
+      JSON.stringify({ text, recipes, offTopic }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err: unknown) {

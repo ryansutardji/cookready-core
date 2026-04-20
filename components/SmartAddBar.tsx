@@ -1,0 +1,527 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Modal,
+  Animated,
+  StyleSheet,
+  Platform,
+} from 'react-native';
+import { Mic, Plus, Check, ChevronDown, X } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase';
+
+type Ingredient = {
+  id: string;
+  name: string;
+  category: string;
+  preferred_unit: string;
+  units: string[];
+};
+
+type Props = {
+  onItemAdded: () => void;
+};
+
+type ToastInfo = {
+  message: string;
+  ingredientName: string;
+  quantity: number;
+  unit: string;
+} | null;
+
+export function SmartAddBar({ onItemAdded }: Props) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Ingredient[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selected, setSelected] = useState<Ingredient | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [selectedUnit, setSelectedUnit] = useState('');
+  const [showUnitPicker, setShowUnitPicker] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<ToastInfo>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const searchIngredients = useCallback(async (text: string) => {
+    if (!text.trim()) {
+      setResults([]);
+      setShowDropdown(false);
+      return;
+    }
+    const { data } = await supabase.rpc
+      ? await (async () => {
+          const { data } = await supabase
+            .from('ingredients')
+            .select('id, name, category, preferred_unit')
+            .ilike('name', `%${text}%`)
+            .order('name')
+            .limit(8);
+          return { data };
+        })()
+      : { data: [] };
+
+    if (data && data.length > 0) {
+      const ids = data.map((d: any) => d.id);
+      const { data: ucData } = await supabase
+        .from('unit_conversions')
+        .select('ingredient_id, input_unit')
+        .in('ingredient_id', ids);
+
+      const { data: globalUc } = await supabase
+        .from('unit_conversions')
+        .select('input_unit')
+        .is('ingredient_id', null);
+
+      const globalUnits = (globalUc ?? []).map((u: any) => u.input_unit).filter(Boolean);
+
+      const ucMap: Record<string, string[]> = {};
+      for (const uc of ucData ?? []) {
+        if (!ucMap[uc.ingredient_id]) ucMap[uc.ingredient_id] = [];
+        if (uc.input_unit) ucMap[uc.ingredient_id].push(uc.input_unit);
+      }
+
+      const enriched: Ingredient[] = data.map((ing: any) => {
+        const specificUnits = ucMap[ing.id] ?? [];
+        const allUnits = Array.from(new Set([ing.preferred_unit, ...specificUnits, ...globalUnits])).filter(Boolean);
+        return { ...ing, units: allUnits };
+      });
+
+      setResults(enriched);
+      setShowDropdown(true);
+    } else {
+      setResults([]);
+      setShowDropdown(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selected) return;
+    const timer = setTimeout(() => searchIngredients(query), 200);
+    return () => clearTimeout(timer);
+  }, [query, selected, searchIngredients]);
+
+  function handleSelect(ing: Ingredient) {
+    setSelected(ing);
+    setQuantity(1);
+    setSelectedUnit(ing.units[0] ?? ing.preferred_unit ?? '');
+    setShowDropdown(false);
+    setQuery('');
+  }
+
+  function handleClear() {
+    setSelected(null);
+    setQuery('');
+    setResults([]);
+    setShowDropdown(false);
+    setQuantity(1);
+    setSelectedUnit('');
+  }
+
+  async function handleSave() {
+    if (!selected || quantity <= 0 || !selectedUnit) return;
+    setSaving(true);
+    try {
+      await supabase.rpc('add_pantry_item', {
+        p_ingredient_name: selected.name,
+        p_quantity: quantity,
+        p_unit: selectedUnit,
+      });
+
+      const toastData: ToastInfo = {
+        message: `${quantity} ${selectedUnit}${quantity !== 1 ? 's' : ''} of ${selected.name} added.`,
+        ingredientName: selected.name,
+        quantity,
+        unit: selectedUnit,
+      };
+
+      handleClear();
+      onItemAdded();
+      showToast(toastData);
+    } catch {
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function showToast(info: ToastInfo) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(info);
+    setToastVisible(true);
+    toastOpacity.setValue(0);
+    Animated.timing(toastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    toastTimer.current = setTimeout(() => dismissToast(), 5000);
+  }
+
+  function dismissToast() {
+    Animated.timing(toastOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+      setToastVisible(false);
+      setToast(null);
+    });
+  }
+
+  async function handleUndo() {
+    if (!toast) return;
+    await supabase.rpc('deplete_pantry_item', {
+      p_ingredient_name: toast.ingredientName,
+      p_quantity: toast.quantity,
+      p_unit: toast.unit,
+    });
+    dismissToast();
+    onItemAdded();
+  }
+
+  const allUnits = selected?.units ?? [];
+
+  return (
+    <View style={styles.wrapper}>
+      {toastVisible && (
+        <Animated.View style={[styles.toast, { opacity: toastOpacity }]}>
+          <Check size={14} color="#4A7C59" strokeWidth={2.5} />
+          <Text style={styles.toastText}>
+            {toast?.message}
+          </Text>
+          <TouchableOpacity onPress={handleUndo} style={styles.undoBtn}>
+            <Text style={styles.undoText}>Undo</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={dismissToast} style={styles.toastClose}>
+            <X size={12} color="#4A7C59" />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      <View style={styles.container}>
+        {!selected ? (
+          <>
+            <View style={styles.searchRow}>
+              <TextInput
+                style={styles.input}
+                placeholder="Add an ingredient to your pantry..."
+                placeholderTextColor="#B8A898"
+                value={query}
+                onChangeText={setQuery}
+                returnKeyType="search"
+              />
+              <TouchableOpacity style={styles.micBtn}>
+                <Mic size={18} color="#D2691E" />
+              </TouchableOpacity>
+            </View>
+
+            {showDropdown && results.length > 0 && (
+              <View style={styles.dropdown}>
+                {results.map((ing, idx) => (
+                  <TouchableOpacity
+                    key={ing.id}
+                    style={[styles.dropdownItem, idx < results.length - 1 && styles.dropdownDivider]}
+                    onPress={() => handleSelect(ing)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.dropdownMain}>
+                      <Text style={styles.dropdownName}>{ing.name}</Text>
+                      <Text style={styles.dropdownCategory}>{ing.category}</Text>
+                    </View>
+                    <Text style={styles.dropdownUnits}>
+                      {ing.units.join(', ')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={styles.stepperRow}>
+            <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
+              <X size={14} color="#8C6A5A" />
+            </TouchableOpacity>
+
+            <Text style={styles.ingredientName}>{selected.name}</Text>
+
+            <View style={styles.stepperControls}>
+              <TouchableOpacity
+                style={styles.stepBtn}
+                onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+              >
+                <Text style={styles.stepBtnText}>−</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.quantityText}>{quantity}</Text>
+
+              <TouchableOpacity
+                style={styles.stepBtn}
+                onPress={() => setQuantity((q) => q + 1)}
+              >
+                <Text style={styles.stepBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.unitSelector}
+              onPress={() => setShowUnitPicker(true)}
+            >
+              <Text style={styles.unitText}>{selectedUnit}</Text>
+              <ChevronDown size={13} color="#4A3728" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.saveBtn, saving && { opacity: 0.5 }]}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              <Check size={16} color="#fff" strokeWidth={2.5} />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      <Modal visible={showUnitPicker} transparent animationType="fade" onRequestClose={() => setShowUnitPicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowUnitPicker(false)}>
+          <View style={styles.pickerCard}>
+            <Text style={styles.pickerTitle}>Select Unit</Text>
+            <ScrollView>
+              {allUnits.map((u) => (
+                <TouchableOpacity
+                  key={u}
+                  style={[styles.pickerOption, u === selectedUnit && styles.pickerOptionSelected]}
+                  onPress={() => { setSelectedUnit(u); setShowUnitPicker(false); }}
+                >
+                  <Text style={[styles.pickerOptionText, u === selectedUnit && styles.pickerOptionTextSelected]}>
+                    {u}
+                  </Text>
+                  {u === selectedUnit && <Check size={14} color="#D2691E" />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrapper: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  toast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EBF5EE',
+    borderWidth: 1,
+    borderColor: '#B8D9C4',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  toastText: {
+    flex: 1,
+    color: '#2D5A3D',
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+  },
+  undoBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  undoText: {
+    color: '#D2691E',
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    textDecorationLine: 'underline',
+  },
+  toastClose: {
+    padding: 2,
+  },
+  container: {
+    backgroundColor: '#F5EFE6',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E0D8CC',
+    overflow: 'visible',
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  input: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2C1810',
+    fontFamily: 'Inter_400Regular',
+    paddingVertical: Platform.OS === 'android' ? 2 : 0,
+  },
+  micBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EDE7DC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dropdown: {
+    borderTopWidth: 1,
+    borderTopColor: '#E0D8CC',
+    backgroundColor: '#FFFAF5',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    gap: 3,
+  },
+  dropdownDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#EDE8DE',
+  },
+  dropdownMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dropdownName: {
+    fontSize: 14,
+    color: '#2C1810',
+    fontFamily: 'Inter_400Regular',
+    fontWeight: '600',
+  },
+  dropdownCategory: {
+    fontSize: 12,
+    color: '#9C7B6A',
+    fontFamily: 'Inter_400Regular',
+  },
+  dropdownUnits: {
+    fontSize: 12,
+    color: '#B8A898',
+    fontFamily: 'Inter_400Regular',
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  clearBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#EDE7DC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ingredientName: {
+    flex: 1,
+    fontSize: 13,
+    color: '#2C1810',
+    fontFamily: 'Inter_400Regular',
+    fontWeight: '600',
+  },
+  stepperControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EDE7DC',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  stepBtn: {
+    width: 32,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepBtnText: {
+    fontSize: 18,
+    color: '#D2691E',
+    fontWeight: '600',
+    lineHeight: 22,
+  },
+  quantityText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#2C1810',
+    minWidth: 28,
+    textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
+  },
+  unitSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EDE7DC',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 4,
+  },
+  unitText: {
+    fontSize: 13,
+    color: '#2C1810',
+    fontFamily: 'Inter_400Regular',
+    fontWeight: '600',
+  },
+  saveBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#D2691E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 48,
+  },
+  pickerCard: {
+    backgroundColor: '#FFFAF5',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxHeight: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  pickerTitle: {
+    fontSize: 15,
+    color: '#2C1810',
+    fontFamily: 'Inter_400Regular',
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  pickerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EDE8DE',
+  },
+  pickerOptionSelected: {
+    backgroundColor: '#FDF5EC',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+  },
+  pickerOptionText: {
+    fontSize: 14,
+    color: '#2C1810',
+    fontFamily: 'Inter_400Regular',
+  },
+  pickerOptionTextSelected: {
+    color: '#D2691E',
+    fontWeight: '600',
+  },
+});

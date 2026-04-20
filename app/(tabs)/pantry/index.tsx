@@ -8,10 +8,12 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { LogOut, RefreshCw } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import type { PantryItem, PantryCategory as PantryCategoryType } from '@/lib/supabase';
 import { PantryCategory } from '@/components/PantryCategory';
+import { SmartAddBar } from '@/components/SmartAddBar';
 
 function groupByCategory(items: PantryItem[]): PantryCategoryType[] {
   const map: Record<string, PantryItem[]> = {};
@@ -25,6 +27,7 @@ function groupByCategory(items: PantryItem[]): PantryCategoryType[] {
 }
 
 export default function PantryScreen() {
+  const router = useRouter();
   const [categories, setCategories] = useState<PantryCategoryType[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,11 +43,47 @@ export default function PantryScreen() {
       if (user?.email) setUserEmail(user.email);
 
       const { data, error: err } = await supabase
-        .from('ai_pantry_snapshot')
-        .select('name, category, human_readable_inventory');
+        .from('user_pantry')
+        .select(`
+          id,
+          current_quantity_value,
+          ingredients(
+            id,
+            name,
+            category,
+            preferred_unit,
+            unit_conversions(input_unit, output_value, output_unit)
+          )
+        `)
+        .order('id');
 
       if (err) throw err;
-      setCategories(groupByCategory((data as PantryItem[]) ?? []));
+
+      const mapped: PantryItem[] = (data ?? []).map((row: any) => {
+        const ing = row.ingredients ?? {};
+        const preferredUnit: string = ing.preferred_unit ?? '';
+        const baseQty: number = parseFloat(row.current_quantity_value ?? '0');
+
+        const conversions: any[] = ing.unit_conversions ?? [];
+        const conv = conversions.find((c: any) => c.input_unit === preferredUnit);
+        const displayQty = conv && conv.output_value
+          ? baseQty / parseFloat(conv.output_value)
+          : baseQty;
+
+        const rounded = Number.isInteger(displayQty) ? displayQty : parseFloat(displayQty.toFixed(1));
+
+        return {
+          id: row.id,
+          name: ing.name ?? '',
+          category: ing.category ?? 'Other',
+          quantity: rounded,
+          unit: preferredUnit,
+          human_readable_inventory: `${rounded} ${preferredUnit}`.trim(),
+          conversionFactor: conv ? parseFloat(conv.output_value) : undefined,
+        };
+      });
+
+      setCategories(groupByCategory(mapped));
     } catch (err: any) {
       setError(err.message ?? 'Failed to load pantry.');
     } finally {
@@ -67,6 +106,20 @@ export default function PantryScreen() {
   function handleRefresh() {
     setRefreshing(true);
     fetchPantry();
+  }
+
+  function handleItemPress(item: PantryItem) {
+    router.push({
+      pathname: '/(tabs)/pantry/edit-item',
+      params: {
+        id: item.id,
+        name: item.name,
+        quantity: String(item.quantity),
+        unit: item.unit,
+        category: item.category,
+        conversionFactor: String(item.conversionFactor ?? ''),
+      },
+    });
   }
 
   const totalItems = categories.reduce((sum, c) => sum + c.items.length, 0);
@@ -147,6 +200,8 @@ export default function PantryScreen() {
         )}
       </View>
 
+      <SmartAddBar onItemAdded={fetchPantry} />
+
       {loading && !refreshing ? (
         <View className="flex-1 items-center justify-center gap-3">
           <ActivityIndicator size="large" color="#D2691E" />
@@ -205,7 +260,7 @@ export default function PantryScreen() {
           }
         >
           {categories.map((cat) => (
-            <PantryCategory key={cat.category} category={cat} />
+            <PantryCategory key={cat.category} category={cat} onItemPress={handleItemPress} />
           ))}
         </ScrollView>
       )}

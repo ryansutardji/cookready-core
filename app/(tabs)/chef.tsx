@@ -7,12 +7,13 @@ import {
   ScrollView,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   StyleSheet,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Send, Sparkles } from 'lucide-react-native';
+import { Send } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import type { PantryItem } from '@/lib/supabase';
 import { ChatMessage } from '@/components/ChatMessage';
@@ -61,11 +62,15 @@ export default function ChefScreen() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
+  const [showAbuseModal, setShowAbuseModal] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const TAB_BAR_HEIGHT = 52 + Math.max(insets.bottom, 8);
 
   const chatHistory = useRef<{ role: 'user' | 'model'; parts: string }[]>([]);
+  const offTopicCount = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -103,17 +108,47 @@ export default function ChefScreen() {
 
       const data = await callChefFunction(messageText, chatHistory.current, pantryContext);
 
+      const responseText: string = data.text ?? '';
+      const recipes = data.recipes ?? [];
+      const offTopic: boolean = data.offTopic === true;
+
       chatHistory.current.push({ role: 'user', parts: messageText });
-      chatHistory.current.push({ role: 'model', parts: data.text ?? '' });
+      chatHistory.current.push({ role: 'model', parts: responseText });
 
       const assistantMessage: Message = {
         id: uid(),
         role: 'assistant',
-        text: data.text ?? '',
-        recipes: data.recipes ?? [],
+        text: responseText,
+        recipes,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+
+      const lowerText = responseText.toLowerCase();
+      const isOffTopic =
+        offTopic ||
+        lowerText.includes("only able to help with recipes") ||
+        lowerText.includes("only here to help with") ||
+        lowerText.includes("i can only assist with") ||
+        lowerText.includes("i'm only able to") ||
+        lowerText.includes("i can't help with that") ||
+        lowerText.includes("outside of my expertise") ||
+        lowerText.includes("i can only help with") ||
+        lowerText.includes("not something i can help") ||
+        lowerText.includes("only help with cooking") ||
+        lowerText.includes("cooking and recipes") && lowerText.includes("only") ||
+        lowerText.includes("politely decline");
+
+      if (isOffTopic) {
+        offTopicCount.current += 1;
+        if (offTopicCount.current === 3) {
+          setShowAbuseModal(true);
+        } else if (offTopicCount.current === 4) {
+          setShowWarningModal(true);
+        } else if (offTopicCount.current >= 5) {
+          setShowLogoutModal(true);
+        }
+      }
     } catch (err: any) {
       const errorMessage: Message = {
         id: uid(),
@@ -156,12 +191,6 @@ export default function ChefScreen() {
                 {pantryItems.length} ingredients available
               </Text>
             </View>
-          </View>
-          <View style={styles.badge}>
-            <Sparkles size={12} color="#D2691E" />
-            <Text style={[styles.badgeText, { fontFamily: 'Inter_400Regular' }]}>
-              Gemini
-            </Text>
           </View>
         </View>
       </View>
@@ -220,6 +249,87 @@ export default function ChefScreen() {
           ))}
         </ScrollView>
       )}
+
+      <Modal
+        visible={showAbuseModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAbuseModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalTitle, { fontFamily: 'NotoSerif_700Bold' }]}>
+              A Gentle Reminder
+            </Text>
+            <Text style={[styles.modalBody, { fontFamily: 'Inter_400Regular' }]}>
+              It looks like you've been asking me about topics outside of cooking and recipes. I'm here solely to help you discover delicious meals using your pantry ingredients. Please keep our conversation focused on food so I can be as helpful as possible.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setShowAbuseModal(false)}
+            >
+              <Text style={[styles.modalButtonText, { fontFamily: 'Inter_400Regular' }]}>
+                Understood
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showWarningModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowWarningModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalTitle, { fontFamily: 'NotoSerif_700Bold' }]}>
+              This Is Your Final Warning
+            </Text>
+            <Text style={[styles.modalBody, { fontFamily: 'Inter_400Regular' }]}>
+              You've continued to ask about things I'm not here for. I truly enjoy helping you cook wonderful meals — but if this continues, I'll have no choice but to log you out. One more off-topic message and we'll have to part ways, at least for now.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setShowWarningModal(false)}
+            >
+              <Text style={[styles.modalButtonText, { fontFamily: 'Inter_400Regular' }]}>
+                I'll Stay on Topic
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showLogoutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalTitle, { fontFamily: 'NotoSerif_700Bold' }]}>
+              Logging You Out
+            </Text>
+            <Text style={[styles.modalBody, { fontFamily: 'Inter_400Regular' }]}>
+              It seems our kitchen wasn't the right fit today. You've been logged out due to repeated misuse of the AI Chef. We hope to welcome you back when you're ready to cook something wonderful.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={async () => {
+                setShowLogoutModal(false);
+                await supabase.auth.signOut();
+              }}
+            >
+              <Text style={[styles.modalButtonText, { fontFamily: 'Inter_400Regular' }]}>
+                OK
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <View style={[styles.inputContainer, { paddingBottom: TAB_BAR_HEIGHT + 8 }]}>
         <View style={styles.inputRow}>
@@ -296,21 +406,6 @@ const styles = StyleSheet.create({
   statusText: {
     color: '#7A9E7E',
     fontSize: 12,
-  },
-  badge: {
-    marginLeft: 'auto',
-    backgroundColor: 'rgba(210,105,30,0.1)',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  badgeText: {
-    color: '#D2691E',
-    fontSize: 12,
-    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
@@ -417,5 +512,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  modalCard: {
+    backgroundColor: '#FFFAF5',
+    borderRadius: 20,
+    padding: 28,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    color: '#2C1810',
+    marginBottom: 12,
+  },
+  modalBody: {
+    fontSize: 14,
+    color: '#5C4033',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  modalButton: {
+    backgroundColor: '#D2691E',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
