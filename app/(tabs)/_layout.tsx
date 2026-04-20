@@ -1,8 +1,7 @@
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { ShoppingBasket, ChefHat } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '@/app/_layout';
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -61,12 +60,6 @@ const styles = StyleSheet.create({
 });
 
 export default function TabsLayout() {
-  const { session, ready } = useAuth();
-
-  if (ready && !session) {
-    return <Redirect href="/(auth)" />;
-  }
-
   return (
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}

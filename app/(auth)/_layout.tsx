@@ -1,13 +1,6 @@
-import { Stack, Redirect } from 'expo-router';
-import { useAuth } from '@/app/_layout';
+import { Stack } from 'expo-router';
 
 export default function AuthLayout() {
-  const { session, ready } = useAuth();
-
-  if (ready && session) {
-    return <Redirect href="/(tabs)/pantry" />;
-  }
-
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
