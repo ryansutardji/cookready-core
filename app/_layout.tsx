@@ -1,6 +1,6 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
-// 1. Added useRootNavigationState to the imports
+// IMPORTANT: Notice we are NOT importing 'router' (the static object)
 import { Stack, useRouter, useRootNavigationState } from 'expo-router'; 
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
@@ -8,7 +8,6 @@ import { useFonts } from 'expo-font';
 import { NotoSerif_700Bold } from '@expo-google-fonts/noto-serif';
 import { Inter_400Regular } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
-import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
@@ -16,81 +15,71 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useFrameworkReady();
-  const router = useRouter();
-  
-  // 2. Initialize the navigation state hook
+  const router = useRouter(); // Use the hook inside the component
   const navigationState = useRootNavigationState();
 
-  const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [session, setSession] = useState(null);
 
   const [fontsLoaded, fontError] = useFonts({
     NotoSerif_700Bold,
     Inter_400Regular,
   });
 
+  // 1. Handle Auth Subscription
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthReady(true);
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
+      setAuthReady(true);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  // 2. Handle Splash Screen
   useEffect(() => {
     if ((fontsLoaded || fontError) && authReady) {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError, authReady]);
 
-  // 3. UPDATED EFFECT: The actual routing logic
+  // 3. The "Safe" Router Logic
   useEffect(() => {
-    // CRITICAL GUARD: If navigationState?.key doesn't exist, the router isn't ready.
-    // If we try to replace now, Expo Go will crash.
-    if (!navigationState?.key) return;
+    // Wait for everything to be ready
+    const isNavigationReady = navigationState?.key;
+    const isAppReady = authReady && (fontsLoaded || fontError);
 
-    if (!authReady || (!fontsLoaded && !fontError)) return;
+    if (!isNavigationReady || !isAppReady) return;
 
-    if (session) {
-      router.replace('/(tabs)/pantry');
-    } else {
-      router.replace('/(auth)');
-    }
-    // Added navigationState?.key to the dependency array
+    // Use a small timeout to ensure the native stack has painted
+    const timeout = setTimeout(() => {
+      if (session) {
+        router.replace('/(tabs)/pantry');
+      } else {
+        router.replace('/(auth)');
+      }
+    }, 1);
+
+    return () => clearTimeout(timeout);
   }, [session, authReady, fontsLoaded, fontError, navigationState?.key]);
 
-  const isReady = (fontsLoaded || !!fontError) && authReady;
-
+  // While waiting, we MUST render the Stack to provide context
+  // but we overlay our loading screen.
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="dark" />
       
-      {/* Keeping the overlay fix Bolt provided, as it is good practice */}
-      {!isReady && (
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: '#FFFAF5',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+      {(!authReady || (!fontsLoaded && !fontError)) && (
+        <View style={{ position: 'absolute', inset: 0, backgroundColor: '#FFFAF5', alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#D2691E" />
         </View>
       )}
