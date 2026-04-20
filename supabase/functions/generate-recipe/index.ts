@@ -41,7 +41,7 @@ Rules for the JSON block:
       "Step 2 description"
     ]
   }
-- ALWAYS include exactly ONE recipe at a time, no matter what the user asks. If the user requests multiple recipes, politely explain that you can only suggest one recipe per message, and offer to suggest another one after they've had a chance to look at the current one
+- Only include ONE recipe at a time unless the user explicitly requests multiple (e.g. "give me 3 recipes")
 - If not suggesting any recipe, leave "recipes" as an empty array []
 - Use the exact ingredient name from the pantry data for "name" fields so they can be matched when depleting stock`;
 

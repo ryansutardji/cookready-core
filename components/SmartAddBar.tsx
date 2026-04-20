@@ -199,7 +199,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
             <View style={styles.searchRow}>
               <TextInput
                 style={styles.input}
-                placeholder="Add an ingredient to your pantry..."
+                placeholder={`Type "1 tub goch" or "2 tbsp soy sauce"...`}
                 placeholderTextColor="#B8A898"
                 value={query}
                 onChangeText={setQuery}
