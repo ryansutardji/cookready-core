@@ -1,6 +1,6 @@
 import '../global.css';
-import { useEffect, useState, createContext, useContext } from 'react';
-import { Stack, router, useRootNavigationState } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import { useFonts } from 'expo-font';
@@ -13,15 +13,11 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 SplashScreen.preventAutoHideAsync();
 
-type AuthContextType = { session: Session | null; ready: boolean };
-const AuthContext = createContext<AuthContextType>({ session: null, ready: false });
-export const useAuth = () => useContext(AuthContext);
-
 export default function RootLayout() {
   useFrameworkReady();
 
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const navigationState = useRootNavigationState();
+  const [session, setSession] = useState<Session | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
     NotoSerif_700Bold,
@@ -31,6 +27,7 @@ export default function RootLayout() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      setAuthReady(true);
     });
 
     const {
@@ -42,28 +39,23 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fontsReady = fontsLoaded || !!fontError;
-  const authReady = session !== undefined;
-  const navReady = !!navigationState?.key;
-  const ready = fontsReady && authReady;
-
   useEffect(() => {
-    if (ready) {
+    if ((fontsLoaded || fontError) && authReady) {
       SplashScreen.hideAsync();
     }
-  }, [ready]);
+  }, [fontsLoaded, fontError, authReady]);
 
   useEffect(() => {
-    if (!ready || !navReady) return;
+    if (!authReady || (!fontsLoaded && !fontError)) return;
 
     if (session) {
-      router.replace('/(tabs)/pantry');
+      router.replace('/(tabs)');
     } else {
       router.replace('/(auth)');
     }
-  }, [ready, navReady, session]);
+  }, [session, authReady, fontsLoaded, fontError]);
 
-  if (!ready) {
+  if (!fontsLoaded && !fontError) {
     return (
       <View
         style={{
@@ -79,13 +71,13 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthContext.Provider value={{ session: session ?? null, ready }}>
+    <>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="dark" />
-    </AuthContext.Provider>
+    </>
   );
 }

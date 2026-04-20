@@ -13,13 +13,9 @@ if (!supabaseUrl || !supabaseUrl.includes('nsunepmaywmmvvlbjwvc')) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type PantryItem = {
-  id: string;
   name: string;
   category: string;
-  quantity: number;
-  unit: string;
   human_readable_inventory: string;
-  conversionFactor?: number;
 };
 
 export type PantryCategory = {
