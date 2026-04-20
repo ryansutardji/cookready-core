@@ -1,6 +1,6 @@
 import '../global.css';
-import { useEffect, useState } from 'react';
-import { Stack, router } from 'expo-router';
+import { useEffect, useState, createContext, useContext } from 'react';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import { useFonts } from 'expo-font';
@@ -13,11 +13,14 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 SplashScreen.preventAutoHideAsync();
 
+type AuthContextType = { session: Session | null; ready: boolean };
+const AuthContext = createContext<AuthContextType>({ session: null, ready: false });
+export const useAuth = () => useContext(AuthContext);
+
 export default function RootLayout() {
   useFrameworkReady();
 
-  const [session, setSession] = useState<Session | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   const [fontsLoaded, fontError] = useFonts({
     NotoSerif_700Bold,
@@ -27,7 +30,6 @@ export default function RootLayout() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setAuthReady(true);
     });
 
     const {
@@ -39,23 +41,15 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const ready = (fontsLoaded || !!fontError) && session !== undefined;
+
   useEffect(() => {
-    if ((fontsLoaded || fontError) && authReady) {
+    if (ready) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError, authReady]);
+  }, [ready]);
 
-  useEffect(() => {
-    if (!authReady || (!fontsLoaded && !fontError)) return;
-
-    if (session) {
-      router.replace('/(tabs)/pantry');
-    } else {
-      router.replace('/(auth)');
-    }
-  }, [session, authReady, fontsLoaded, fontError]);
-
-  if (!fontsLoaded && !fontError) {
+  if (!ready) {
     return (
       <View
         style={{
@@ -71,13 +65,13 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <AuthContext.Provider value={{ session: session ?? null, ready }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="dark" />
-    </>
+    </AuthContext.Provider>
   );
 }
