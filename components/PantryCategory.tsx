@@ -1,8 +1,10 @@
-import { View, Text } from 'react-native';
-import type { PantryCategory as PantryCategoryType } from '@/lib/supabase';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { ChevronRight } from 'lucide-react-native';
+import type { PantryItem, PantryCategory as PantryCategoryType } from '@/lib/supabase';
 
 type Props = {
   category: PantryCategoryType;
+  onItemPress: (item: PantryItem) => void;
 };
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -28,7 +30,7 @@ function formatInventory(raw: string): string {
   });
 }
 
-export function PantryCategory({ category }: Props) {
+export function PantryCategory({ category, onItemPress }: Props) {
   const icon = CATEGORY_ICONS[category.category] ?? '📦';
 
   return (
@@ -50,8 +52,10 @@ export function PantryCategory({ category }: Props) {
 
       <View className="px-4 py-2">
         {category.items.map((item, idx) => (
-          <View
-            key={item.name}
+          <TouchableOpacity
+            key={item.id}
+            onPress={() => onItemPress(item)}
+            activeOpacity={0.6}
             className={`flex-row justify-between items-center py-2.5 ${
               idx < category.items.length - 1 ? 'border-b border-[#EDE8DE]' : ''
             }`}
@@ -62,13 +66,16 @@ export function PantryCategory({ category }: Props) {
             >
               {item.name}
             </Text>
-            <Text
-              className="text-terracotta text-sm font-semibold ml-4"
-              style={{ fontFamily: 'Inter_400Regular' }}
-            >
-              {formatInventory(item.human_readable_inventory)}
-            </Text>
-          </View>
+            <View className="flex-row items-center gap-2">
+              <Text
+                className="text-terracotta text-sm font-semibold"
+                style={{ fontFamily: 'Inter_400Regular' }}
+              >
+                {formatInventory(item.human_readable_inventory)}
+              </Text>
+              <ChevronRight size={14} color="#D2691E" />
+            </View>
+          </TouchableOpacity>
         ))}
       </View>
     </View>
