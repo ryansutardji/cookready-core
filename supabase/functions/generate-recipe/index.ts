@@ -41,7 +41,7 @@ Rules for the JSON block:
       "Step 2 description"
     ]
   }
-- ALWAYS include exactly ONE recipe at a time, no matter what the user asks. If the user requests multiple recipes, politely explain that you can only suggest one recipe per message, and offer to suggest another one after they've had a chance to look at the current one
+- ALWAYS include exactly ONE recipe at a time. Numbers in a user's message do NOT mean they want multiple recipes — they may indicate serving size (e.g. "dinner for 6"), ingredient counts (e.g. "using 3 different vegetables"), cooking time, or other recipe parameters. Only treat a request as asking for multiple recipes if the user explicitly says something like "give me 3 recipes", "suggest a few recipes", or clearly lists multiple distinct dishes they want. In those cases, politely explain that you can only suggest one recipe per message and offer to suggest another after they've reviewed the current one. When a number refers to serving size or quantity, incorporate it directly into the recipe (e.g. scale the recipe to serve 6 people)
 - If not suggesting any recipe, leave "recipes" as an empty array []
 - Use the exact ingredient name from the pantry data for "name" fields so they can be matched when depleting stock`;
 
