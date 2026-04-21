@@ -173,7 +173,7 @@ export default function ChefScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={TAB_BAR_HEIGHT}
     >
       <View style={styles.header}>
@@ -331,7 +331,7 @@ export default function ChefScreen() {
         </View>
       </Modal>
 
-      <View style={[styles.inputContainer, { paddingBottom: TAB_BAR_HEIGHT + 8 }]}>
+      <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
         <View style={styles.inputRow}>
           <TextInput
             value={input}
