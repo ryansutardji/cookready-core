@@ -331,7 +331,7 @@ export default function ChefScreen() {
         </View>
       </Modal>
 
-      <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      <View style={[styles.inputContainer, { paddingBottom: TAB_BAR_HEIGHT }]}>
         <View style={styles.inputRow}>
           <TextInput
             value={input}
