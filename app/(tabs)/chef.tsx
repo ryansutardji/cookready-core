@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   StyleSheet,
@@ -68,9 +68,18 @@ export default function ChefScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const TAB_BAR_HEIGHT = 52 + Math.max(insets.bottom, 8);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const chatHistory = useRef<{ role: 'user' | 'model'; parts: string }[]>([]);
   const offTopicCount = useRef(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const onShow = Keyboard.addListener(showEvent, (e) => setKeyboardHeight(e.endCoordinates.height));
+    const onHide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => { onShow.remove(); onHide.remove(); };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -171,11 +180,7 @@ export default function ChefScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior="padding"
-      keyboardVerticalOffset={TAB_BAR_HEIGHT}
-    >
+    <View style={styles.root}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.avatar}>
@@ -331,7 +336,7 @@ export default function ChefScreen() {
         </View>
       </Modal>
 
-      <View style={[styles.inputContainer, { paddingBottom: TAB_BAR_HEIGHT }]}>
+      <View style={[styles.inputContainer, { paddingBottom: keyboardHeight > 0 ? keyboardHeight - TAB_BAR_HEIGHT + 10 : TAB_BAR_HEIGHT }]}>
         <View style={styles.inputRow}>
           <TextInput
             value={input}
@@ -355,7 +360,7 @@ export default function ChefScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
