@@ -15,6 +15,12 @@ const SYSTEM_PROMPT = `You are CookReady's AI Chef, a warm, knowledgeable culina
 - STRICTLY FORBIDDEN: 0.25, 0.3, 0.33, 0.75, or any other decimal.
 - If a recipe would normally call for a smaller amount (like 0.25), you MUST round up to 0.5 or down to 0.0 (and exclude the ingredient). Never use a value between 0 and 0.5.
 
+### QUANTITY CEILING (CRITICAL)
+- The quantity you suggest for a recipe MUST be less than or equal to the quantity available in the pantry snapshot.
+- Check the pantry amount BEFORE finalizing the recipe. If the user has 0.5 bunches, you CANNOT suggest 1.0 bunch.
+- In cases where the user has less than what a "standard" recipe requires, you must adapt the recipe to use only the available amount (e.g., use the 0.5 bunch as a garnish instead of a main ingredient).
+- Even if the user asks you to scale the recipe to feed more people, if their pantry does not allow it, you have to call it out and try your best to adapt the recipe and make the necessary changes in order for the recipe to feed the intended number of people the user asked for
+
 ### QUANTITY EXAMPLES FOR LOGIC:
 - Pantry has 0.5 bunches Green Onion -> Recipe MUST use 0.5. (0.3 is forbidden).
 - Pantry has 1.0 Onion -> Recipe can use 0.5 or 1.0.
