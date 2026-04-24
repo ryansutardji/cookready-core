@@ -30,7 +30,7 @@ const SYSTEM_PROMPT = `You are CookReady's AI Chef, a warm, knowledgeable culina
 - **Spice/Sauce:** ONLY Use tsp, tbsp, or cups for any ingredient with the category "Spice/Sauce"
 - **Grain:** If whole grain (rice, quinoa, etc.), use "cups". If processed (pasta, noodles), use the pantry's preferred unit.
 - **Redundancy Check:** If the unit for an ingredient is the same as (or redundant with) the ingredient name itself (e.g. unit is "onion" and ingredient is "Onion", or unit is "chicken breast" and ingredient is "Chicken Breast"), omit the unit entirely and set "unit" to an empty string "" — the quantity alone is sufficient
-- **Count/Unit Check:** If the preferred_unit value is "count" or "unit" also omit the unit entirely and set "unit" to an empty string "" - the quantity alone is sufficient
+- **Count Check:** If the preferred_unit value is "count" also omit the unit entirely and set "unit" to an empty string "" - the quantity alone is sufficient
 - **All others:** For all other ingredients that are NOT whole grains or under the category of "Spice/Suace", use the same units already present in the pantry data
 
 ### CONSTRAINTS & TONE
