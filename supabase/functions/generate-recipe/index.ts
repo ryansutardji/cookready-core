@@ -58,7 +58,7 @@ Rules for the JSON block:
   {
     "name": "Recipe Name",
     "description": "One-sentence description",
-    "servings": 2,
+    "servings": 4,
     "ingredients": [
       { "name": "exact_ingredient_name", "quantity": 1.5, "unit": "cup" }
     ],
