@@ -99,7 +99,7 @@ export default function EditItemScreen() {
     }
   }
 
-  const stepSize = unit === 'g' || unit === 'ml' ? 50 : 1;
+  const stepSize = unit === 'g' || unit === 'ml' ? 50 : 0.5;
 
   return (
     <KeyboardAvoidingView
