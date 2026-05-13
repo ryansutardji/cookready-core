@@ -42,30 +42,42 @@ export default function PantryScreen() {
       } = await supabase.auth.getUser();
       if (user?.email) setUserEmail(user.email);
 
-      const { data, error: err } = await supabase
-        .from('user_pantry')
-        .select(`
-          id,
-          current_quantity_value,
-          ingredients(
+      const [pantryResult, globalConvResult] = await Promise.all([
+        supabase
+          .from('user_pantry')
+          .select(`
             id,
-            name,
-            category,
-            preferred_unit,
-            unit_conversions(input_unit, output_value, output_unit)
-          )
-        `)
-        .order('id');
+            current_quantity_value,
+            ingredients(
+              id,
+              name,
+              category,
+              preferred_unit,
+              unit_conversions(input_unit, output_value, output_unit)
+            )
+          `)
+          .order('id'),
+        supabase
+          .from('unit_conversions')
+          .select('input_unit, output_value, output_unit')
+          .is('ingredient_id', null),
+      ]);
 
-      if (err) throw err;
+      if (pantryResult.error) throw pantryResult.error;
+      if (globalConvResult.error) throw globalConvResult.error;
 
-      const mapped: PantryItem[] = (data ?? []).map((row: any) => {
+      const globalConversions: any[] = globalConvResult.data ?? [];
+
+      const mapped: PantryItem[] = (pantryResult.data ?? []).map((row: any) => {
         const ing = row.ingredients ?? {};
         const preferredUnit: string = ing.preferred_unit ?? '';
         const baseQty: number = parseFloat(row.current_quantity_value ?? '0');
 
-        const conversions: any[] = ing.unit_conversions ?? [];
-        const conv = conversions.find((c: any) => c.input_unit === preferredUnit);
+        const ingredientConversions: any[] = ing.unit_conversions ?? [];
+        const conv =
+          ingredientConversions.find((c: any) => c.input_unit === preferredUnit) ??
+          globalConversions.find((c: any) => c.input_unit === preferredUnit);
+
         const displayQty = conv && conv.output_value
           ? baseQty / parseFloat(conv.output_value)
           : baseQty;
