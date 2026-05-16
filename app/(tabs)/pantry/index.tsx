@@ -44,7 +44,7 @@ export default function PantryScreen() {
 
       const [pantryResult, globalConvResult] = await Promise.all([
         supabase
-          .from('user_pantry_available_ingredients')
+          .from('user_pantry')
           .select(`
             id,
             current_quantity_value,
@@ -56,6 +56,7 @@ export default function PantryScreen() {
               unit_conversions(input_unit, output_value, output_unit)
             )
           `)
+          .gt('current_quantity_value', 0)
           .order('id'),
         supabase
           .from('unit_conversions')
