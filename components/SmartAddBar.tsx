@@ -17,6 +17,7 @@ type Ingredient = {
   id: string;
   name: string;
   category: string;
+  base_unit: string;
   preferred_unit: string;
   units: string[];
 };
@@ -56,7 +57,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
       ? await (async () => {
           const { data } = await supabase
             .from('ingredients')
-            .select('id, name, category, preferred_unit')
+            .select('id, name, category, base_unit, preferred_unit')
             .ilike('name', `%${text}%`)
             .order('name')
             .limit(8);
@@ -73,10 +74,8 @@ export function SmartAddBar({ onItemAdded }: Props) {
 
       const { data: globalUc } = await supabase
         .from('unit_conversions')
-        .select('input_unit')
+        .select('input_unit, output_unit')
         .is('ingredient_id', null);
-
-      const globalUnits = (globalUc ?? []).map((u: any) => u.input_unit).filter(Boolean);
 
       const ucMap: Record<string, string[]> = {};
       for (const uc of ucData ?? []) {
@@ -86,7 +85,13 @@ export function SmartAddBar({ onItemAdded }: Props) {
 
       const enriched: Ingredient[] = data.map((ing: any) => {
         const specificUnits = ucMap[ing.id] ?? [];
-        const allUnits = Array.from(new Set([ing.preferred_unit, ...specificUnits, ...globalUnits])).filter(Boolean);
+        const compatibleGlobalUnits = (globalUc ?? [])
+          .filter((u: any) => u.output_unit === ing.base_unit)
+          .map((u: any) => u.input_unit)
+          .filter(Boolean);
+        const allUnits = Array.from(
+          new Set([ing.preferred_unit, ing.base_unit, ...specificUnits, ...compatibleGlobalUnits])
+        ).filter(Boolean);
         return { ...ing, units: allUnits };
       });
 
