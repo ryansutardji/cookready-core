@@ -89,6 +89,8 @@ export default function AuthScreen() {
                 style={[styles.tab, mode === m && styles.tabActive]}
               >
                 <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                   style={[
                     styles.tabText,
                     { fontFamily: 'Inter_400Regular' },
@@ -197,6 +199,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 36,
     textAlign: 'center',
+    width: '100%',
   },
   heroSubtitle: {
     color: 'rgba(255,255,255,0.80)',
@@ -239,6 +242,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: `${ESPRESSO}99`,
+    flexShrink: 1,
   },
   tabTextActive: {
     color: '#fff',
