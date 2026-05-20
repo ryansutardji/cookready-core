@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Animated,
+  PanResponder,
   StyleSheet,
   ActivityIndicator,
   Platform,
@@ -37,9 +38,40 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
   const [unitPickerIndex, setUnitPickerIndex] = useState<number | null>(null);
   const [unitPickerRow, setUnitPickerRow] = useState<IngredientRow | null>(null);
   const slideAnim = useRef(new Animated.Value(600)).current;
+  const panY = useRef(new Animated.Value(0)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) =>
+        gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onPanResponderMove: (_, gs) => {
+        if (gs.dy > 0) panY.setValue(gs.dy);
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 80 || gs.vy > 0.8) {
+          Animated.timing(panY, {
+            toValue: 700,
+            duration: 220,
+            useNativeDriver: true,
+          }).start(() => {
+            panY.setValue(0);
+            onClose();
+          });
+        } else {
+          Animated.spring(panY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 80,
+            friction: 12,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     if (visible && bundle) {
+      panY.setValue(0);
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
@@ -189,6 +221,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
 
   function handleClose() {
     setUnitPickerIndex(null);
+    panY.setValue(0);
     onClose();
   }
 
@@ -205,9 +238,18 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
 
-        <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
-          {/* Handle */}
-          <View style={styles.handle} />
+        <Animated.View
+          style={[
+            styles.sheet,
+            { transform: [{ translateY: Animated.add(slideAnim, panY) }] },
+          ]}
+        >
+          {/* Drag zone: handle bar + header — swipe down here to dismiss */}
+          <View {...panResponder.panHandlers}>
+            {/* Handle */}
+            <View style={styles.handleWrap}>
+              <View style={styles.handle} />
+            </View>
 
           {/* Header */}
           {bundle && (
@@ -242,6 +284,8 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
               )}
             </View>
           )}
+          </View>
+          {/* End drag zone */}
 
           {/* Ingredient List */}
           {loading ? (
@@ -411,14 +455,16 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 20,
   },
+  handleWrap: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
   handle: {
     width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: '#D8C9B8',
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 4,
   },
   header: {
     flexDirection: 'row',
