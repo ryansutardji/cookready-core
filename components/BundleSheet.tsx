@@ -38,38 +38,36 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
   const [saving, setSaving] = useState(false);
   const [unitPickerIndex, setUnitPickerIndex] = useState<number | null>(null);
   const [unitPickerRow, setUnitPickerRow] = useState<IngredientRow | null>(null);
-  const slideAnim = useRef(new Animated.Value(600)).current;
-  const panY = useRef(new Animated.Value(0)).current;
-  const listScrollY = useRef(0);
+  // Single animated value drives all sheet movement — avoids Animated.add jank
+  const sheetY = useRef(new Animated.Value(700)).current;
+  // Track the settled position so drag offsets are computed correctly
+  const settledY = useRef(700);
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) =>
-        gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5 && listScrollY.current <= 0,
+        gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
       onPanResponderMove: (_, gs) => {
-        if (gs.dy > 0) panY.setValue(gs.dy);
+        if (gs.dy > 0) sheetY.setValue(settledY.current + gs.dy);
       },
       onPanResponderRelease: (_, gs) => {
         if (gs.dy > 80 || gs.vy > 0.5) {
-          // Accelerate away — easeIn makes it feel like it's being thrown
-          const remainingDistance = Math.max(300, 700 - gs.dy);
-          const duration = Math.min(280, Math.max(160, remainingDistance / (gs.vy > 0.5 ? gs.vy * 400 : 2)));
-          Animated.timing(panY, {
-            toValue: gs.dy + remainingDistance,
-            duration,
+          Animated.timing(sheetY, {
+            toValue: 700,
+            duration: 220,
             easing: Easing.in(Easing.ease),
             useNativeDriver: true,
           }).start(() => {
-            panY.setValue(0);
+            settledY.current = 700;
             onClose();
           });
         } else {
-          Animated.spring(panY, {
+          Animated.spring(sheetY, {
             toValue: 0,
             useNativeDriver: true,
             tension: 60,
             friction: 14,
-          }).start();
+          }).start(() => { settledY.current = 0; });
         }
       },
     })
@@ -77,20 +75,22 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
 
   useEffect(() => {
     if (visible && bundle) {
-      panY.setValue(0);
-      Animated.spring(slideAnim, {
+      sheetY.setValue(700);
+      settledY.current = 700;
+      Animated.spring(sheetY, {
         toValue: 0,
         useNativeDriver: true,
         tension: 65,
         friction: 11,
-      }).start();
+      }).start(() => { settledY.current = 0; });
       loadIngredients(bundle);
     } else {
-      Animated.timing(slideAnim, {
-        toValue: 600,
+      Animated.timing(sheetY, {
+        toValue: 700,
         duration: 250,
+        easing: Easing.in(Easing.ease),
         useNativeDriver: true,
-      }).start();
+      }).start(() => { settledY.current = 700; });
     }
   }, [visible, bundle]);
 
@@ -227,7 +227,8 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
 
   function handleClose() {
     setUnitPickerIndex(null);
-    panY.setValue(0);
+    sheetY.setValue(700);
+    settledY.current = 700;
     onClose();
   }
 
@@ -247,48 +248,50 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
         <Animated.View
           style={[
             styles.sheet,
-            { transform: [{ translateY: Animated.add(slideAnim, panY) }] },
+            { transform: [{ translateY: sheetY }] },
           ]}
-          {...panResponder.panHandlers}
         >
-          {/* Handle */}
-          <View style={styles.handleWrap}>
-            <View style={styles.handle} />
+          {/* Drag zone: handle + header + pills */}
+          <View {...panResponder.panHandlers}>
+            {/* Handle */}
+            <View style={styles.handleWrap}>
+              <View style={styles.handle} />
+            </View>
+
+            {/* Header */}
+            {bundle && (
+              <View style={styles.header}>
+                <View style={styles.headerLeft}>
+                  <View style={styles.headerIconWrap}>
+                    <Text style={styles.headerIcon}>{bundle.icon}</Text>
+                  </View>
+                  <View style={styles.headerText}>
+                    <Text style={styles.headerTitle}>{bundle.name}</Text>
+                    <Text style={styles.headerDesc}>{bundle.description}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+                  <X size={16} color="#6B5344" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Pills */}
+            {bundle && !loading && (
+              <View style={styles.pills}>
+                <View style={styles.pill}>
+                  <Text style={styles.pillText}>{bundle.ingredients.length} ingredients</Text>
+                </View>
+                {alreadyHaveCount > 0 && (
+                  <View style={[styles.pill, styles.pillHave]}>
+                    <Text style={[styles.pillText, styles.pillHaveText]}>
+                      {alreadyHaveCount} already in pantry
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
-
-          {/* Header */}
-          {bundle && (
-            <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <View style={styles.headerIconWrap}>
-                  <Text style={styles.headerIcon}>{bundle.icon}</Text>
-                </View>
-                <View style={styles.headerText}>
-                  <Text style={styles.headerTitle}>{bundle.name}</Text>
-                  <Text style={styles.headerDesc}>{bundle.description}</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-                <X size={16} color="#6B5344" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Pills */}
-          {bundle && !loading && (
-            <View style={styles.pills}>
-              <View style={styles.pill}>
-                <Text style={styles.pillText}>{bundle.ingredients.length} ingredients</Text>
-              </View>
-              {alreadyHaveCount > 0 && (
-                <View style={[styles.pill, styles.pillHave]}>
-                  <Text style={[styles.pillText, styles.pillHaveText]}>
-                    {alreadyHaveCount} already in pantry
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
 
           {/* Ingredient List */}
           {loading ? (
@@ -300,8 +303,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
               style={styles.list}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
-              onScroll={(e) => { listScrollY.current = e.nativeEvent.contentOffset.y; }}
-              scrollEventThrottle={16}
+
             >
               {rows.map((row, idx) => (
                 <View
