@@ -26,3 +26,23 @@ export type PantryCategory = {
   category: string;
   items: PantryItem[];
 };
+
+export type SavedRecipeIngredient = {
+  name: string;
+  quantity: number;
+  unit: string;
+};
+
+export type SavedRecipe = {
+  id: string;
+  user_id: string;
+  recipe_name: string;
+  description: string;
+  servings: number;
+  ingredients: SavedRecipeIngredient[];
+  instructions: string[];
+  is_archived: boolean;
+  created_at: string;
+  archived_at: string | null;
+  is_able_to_cook?: boolean;
+};

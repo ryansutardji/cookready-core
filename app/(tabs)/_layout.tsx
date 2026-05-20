@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { ShoppingBasket, ChefHat } from 'lucide-react-native';
+import { ShoppingBasket, ChefHat, BookOpen } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
@@ -82,6 +82,15 @@ export default function TabsLayout() {
           title: 'AI Chef',
           tabBarIcon: ({ size, color }) => (
             <ChefHat size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="recipes"
+        options={{
+          title: 'Recipes',
+          tabBarIcon: ({ size, color }) => (
+            <BookOpen size={size} color={color} />
           ),
         }}
       />
