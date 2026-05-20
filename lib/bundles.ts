@@ -20,13 +20,12 @@ export const BUNDLES: Bundle[] = [
     tag: 'Everyday',
     icon: '🧂',
     ingredients: [
-      { name: 'Table Salt', defaultUnit: 'container' },
+      { name: 'Salt', defaultUnit: 'container' },
       { name: 'Black Pepper (Ground)', defaultUnit: 'jar' },
       { name: 'Garlic Powder', defaultUnit: 'jar' },
       { name: 'Onion Powder', defaultUnit: 'jar' },
       { name: 'Paprika', defaultUnit: 'jar' },
       { name: 'Cumin (Ground)', defaultUnit: 'jar' },
-      { name: 'Dried Oregano', defaultUnit: 'jar' },
     ],
   },
   {
