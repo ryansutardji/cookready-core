@@ -40,11 +40,12 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
   const [unitPickerRow, setUnitPickerRow] = useState<IngredientRow | null>(null);
   const slideAnim = useRef(new Animated.Value(600)).current;
   const panY = useRef(new Animated.Value(0)).current;
+  const listScrollY = useRef(0);
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) =>
-        gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
+        gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5 && listScrollY.current <= 0,
       onPanResponderMove: (_, gs) => {
         if (gs.dy > 0) panY.setValue(gs.dy);
       },
@@ -248,13 +249,12 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
             styles.sheet,
             { transform: [{ translateY: Animated.add(slideAnim, panY) }] },
           ]}
+          {...panResponder.panHandlers}
         >
-          {/* Drag zone: handle bar + header — swipe down here to dismiss */}
-          <View {...panResponder.panHandlers}>
-            {/* Handle */}
-            <View style={styles.handleWrap}>
-              <View style={styles.handle} />
-            </View>
+          {/* Handle */}
+          <View style={styles.handleWrap}>
+            <View style={styles.handle} />
+          </View>
 
           {/* Header */}
           {bundle && (
@@ -289,8 +289,6 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
               )}
             </View>
           )}
-          </View>
-          {/* End drag zone */}
 
           {/* Ingredient List */}
           {loading ? (
@@ -302,6 +300,8 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
               style={styles.list}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
+              onScroll={(e) => { listScrollY.current = e.nativeEvent.contentOffset.y; }}
+              scrollEventThrottle={16}
             >
               {rows.map((row, idx) => (
                 <View
