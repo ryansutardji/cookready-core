@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
-import { ChefHat, Users, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { ChefHat, Users, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Bookmark } from 'lucide-react-native';
 import type { Recipe } from '@/lib/gemini';
 import { supabase } from '@/lib/supabase';
 
@@ -10,6 +10,7 @@ type Props = {
 };
 
 type CookState = 'idle' | 'cooking' | 'success' | 'error';
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 function formatQuantity(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -19,6 +20,29 @@ export function RecipeCard({ recipe, onCooked }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [cookState, setCookState] = useState<CookState>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [saveError, setSaveError] = useState('');
+
+  async function handleSave() {
+    if (saveState === 'saved' || saveState === 'saving') return;
+    setSaveState('saving');
+    setSaveError('');
+
+    const { error } = await supabase.from('saved_recipes').insert({
+      recipe_name: recipe.name,
+      description: recipe.description,
+      servings: recipe.servings,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+    });
+
+    if (error) {
+      setSaveState('error');
+      setSaveError('Could not save recipe.');
+    } else {
+      setSaveState('saved');
+    }
+  }
 
   async function handleCookThis() {
     setCookState('cooking');
@@ -54,6 +78,22 @@ export function RecipeCard({ recipe, onCooked }: Props) {
             {recipe.servings}
           </Text>
         </View>
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={saveState === 'saving' || saveState === 'saved'}
+          style={styles.saveBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          {saveState === 'saving' ? (
+            <ActivityIndicator size="small" color="#D2691E" />
+          ) : (
+            <Bookmark
+              size={18}
+              color="#D2691E"
+              fill={saveState === 'saved' ? '#D2691E' : 'transparent'}
+            />
+          )}
+        </TouchableOpacity>
       </View>
 
       <View style={styles.body}>
@@ -100,6 +140,24 @@ export function RecipeCard({ recipe, onCooked }: Props) {
                 </Text>
               </View>
             ))}
+          </View>
+        )}
+
+        {saveState === 'saved' && (
+          <View style={styles.saveBanner}>
+            <Bookmark size={13} color="#708238" fill="#708238" />
+            <Text style={[styles.saveBannerText, { fontFamily: 'Inter_400Regular' }]}>
+              Saved to your recipes!
+            </Text>
+          </View>
+        )}
+
+        {saveState === 'error' && (
+          <View style={styles.errorBanner}>
+            <AlertCircle size={14} color="#ef4444" />
+            <Text style={[styles.errorText, { fontFamily: 'Inter_400Regular' }]}>
+              {saveError}
+            </Text>
           </View>
         )}
 
@@ -295,5 +353,27 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 13,
+  },
+  saveBtn: {
+    marginLeft: 4,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    backgroundColor: 'rgba(112,130,56,0.1)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  saveBannerText: {
+    color: '#708238',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
