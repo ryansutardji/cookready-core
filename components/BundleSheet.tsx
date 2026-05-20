@@ -35,6 +35,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [unitPickerIndex, setUnitPickerIndex] = useState<number | null>(null);
+  const [unitPickerRow, setUnitPickerRow] = useState<IngredientRow | null>(null);
   const slideAnim = useRef(new Animated.Value(600)).current;
 
   useEffect(() => {
@@ -148,11 +149,22 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
     );
   }
 
+  function openUnitPicker(idx: number) {
+    setUnitPickerIndex(idx);
+    setUnitPickerRow(rows[idx]);
+  }
+
   function selectUnit(idx: number, unit: string) {
     setRows((prev) =>
       prev.map((r, i) => (i === idx ? { ...r, selectedUnit: unit } : r))
     );
     setUnitPickerIndex(null);
+    setUnitPickerRow(null);
+  }
+
+  function closeUnitPicker() {
+    setUnitPickerIndex(null);
+    setUnitPickerRow(null);
   }
 
   const checkedRows = rows.filter((r) => r.checked);
@@ -284,7 +296,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
 
                     <TouchableOpacity
                       style={styles.unitBtn}
-                      onPress={() => setUnitPickerIndex(unitPickerIndex === idx ? null : idx)}
+                      onPress={() => openUnitPicker(idx)}
                     >
                       <Text style={styles.unitText} numberOfLines={1}>
                         {row.selectedUnit}
@@ -302,37 +314,52 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
                     )}
                   </View>
 
-                  {/* Unit picker inline dropdown */}
-                  {unitPickerIndex === idx && (
-                    <View style={styles.unitDropdown}>
-                      {row.availableUnits.map((u) => (
-                        <TouchableOpacity
-                          key={u}
-                          style={[
-                            styles.unitOption,
-                            u === row.selectedUnit && styles.unitOptionSelected,
-                          ]}
-                          onPress={() => selectUnit(idx, u)}
-                        >
-                          <Text
-                            style={[
-                              styles.unitOptionText,
-                              u === row.selectedUnit && styles.unitOptionTextSelected,
-                            ]}
-                          >
-                            {u}
-                          </Text>
-                          {u === row.selectedUnit && (
-                            <Check size={12} color="#D2691E" strokeWidth={2.5} />
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
                 </View>
               ))}
             </ScrollView>
           )}
+
+          {/* Unit picker modal */}
+          <Modal
+            visible={unitPickerIndex !== null}
+            transparent
+            animationType="fade"
+            onRequestClose={closeUnitPicker}
+          >
+            <TouchableOpacity
+              style={styles.pickerOverlay}
+              activeOpacity={1}
+              onPress={closeUnitPicker}
+            >
+              <View style={styles.pickerCard}>
+                <Text style={styles.pickerTitle}>Select Unit</Text>
+                <ScrollView>
+                  {(unitPickerRow?.availableUnits ?? []).map((u) => (
+                    <TouchableOpacity
+                      key={u}
+                      style={[
+                        styles.pickerOption,
+                        u === unitPickerRow?.selectedUnit && styles.pickerOptionSelected,
+                      ]}
+                      onPress={() => unitPickerIndex !== null && selectUnit(unitPickerIndex, u)}
+                    >
+                      <Text
+                        style={[
+                          styles.pickerOptionText,
+                          u === unitPickerRow?.selectedUnit && styles.pickerOptionTextSelected,
+                        ]}
+                      >
+                        {u}
+                      </Text>
+                      {u === unitPickerRow?.selectedUnit && (
+                        <Check size={14} color="#D2691E" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
           {/* Add Button */}
           <View style={styles.footer}>
@@ -574,39 +601,52 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  unitDropdown: {
-    position: 'absolute',
-    right: 60,
-    top: 44,
-    backgroundColor: '#FFFAF5',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E0D8CC',
-    zIndex: 100,
-    minWidth: 110,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 48,
   },
-  unitOption: {
+  pickerCard: {
+    backgroundColor: '#FFFAF5',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxHeight: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  pickerTitle: {
+    fontSize: 15,
+    color: '#2C1810',
+    fontFamily: 'Inter_400Regular',
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  pickerOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EDE8DE',
   },
-  unitOptionSelected: {
+  pickerOptionSelected: {
     backgroundColor: '#FDF5EC',
+    borderRadius: 8,
+    paddingHorizontal: 8,
   },
-  unitOptionText: {
-    fontSize: 13,
+  pickerOptionText: {
+    fontSize: 14,
     color: '#2C1810',
     fontFamily: 'Inter_400Regular',
   },
-  unitOptionTextSelected: {
+  pickerOptionTextSelected: {
     color: '#D2691E',
     fontWeight: '600',
   },
