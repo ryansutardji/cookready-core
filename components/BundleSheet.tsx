@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Animated,
+  Easing,
   PanResponder,
   StyleSheet,
   ActivityIndicator,
@@ -43,15 +44,19 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) =>
-        gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx),
+        gs.dy > 6 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
       onPanResponderMove: (_, gs) => {
         if (gs.dy > 0) panY.setValue(gs.dy);
       },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dy > 80 || gs.vy > 0.8) {
+        if (gs.dy > 80 || gs.vy > 0.5) {
+          // Accelerate away — easeIn makes it feel like it's being thrown
+          const remainingDistance = Math.max(300, 700 - gs.dy);
+          const duration = Math.min(280, Math.max(160, remainingDistance / (gs.vy > 0.5 ? gs.vy * 400 : 2)));
           Animated.timing(panY, {
-            toValue: 700,
-            duration: 220,
+            toValue: gs.dy + remainingDistance,
+            duration,
+            easing: Easing.in(Easing.ease),
             useNativeDriver: true,
           }).start(() => {
             panY.setValue(0);
@@ -61,8 +66,8 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
           Animated.spring(panY, {
             toValue: 0,
             useNativeDriver: true,
-            tension: 80,
-            friction: 12,
+            tension: 60,
+            friction: 14,
           }).start();
         }
       },
