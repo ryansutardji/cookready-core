@@ -257,15 +257,24 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
               {rows.map((row, idx) => (
                 <View
                   key={row.name}
-                  style={[styles.ingredientRow, idx < rows.length - 1 && styles.ingredientDivider]}
+                  style={[
+                    styles.ingredientRow,
+                    idx < rows.length - 1 && styles.ingredientDivider,
+                    row.alreadyHave && styles.ingredientRowHave,
+                  ]}
                 >
-                  {/* Checkbox */}
+                  {/* Checkbox — green-tinted border when already in pantry */}
                   <TouchableOpacity
-                    style={[styles.checkbox, row.checked && styles.checkboxChecked]}
+                    style={[
+                      styles.checkbox,
+                      row.checked && styles.checkboxChecked,
+                      row.alreadyHave && !row.checked && styles.checkboxHave,
+                    ]}
                     onPress={() => toggleRow(idx)}
                     activeOpacity={0.7}
                   >
                     {row.checked && <Check size={12} color="#fff" strokeWidth={3} />}
+                    {row.alreadyHave && !row.checked && <View style={styles.haveDot} />}
                   </TouchableOpacity>
 
                   {/* Name */}
@@ -276,7 +285,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
                     {row.name}
                   </Text>
 
-                  {/* Stepper + Unit row — fixed layout, HAVE badge absolutely positioned */}
+                  {/* Stepper + Unit */}
                   <View style={styles.controls}>
                     <View style={styles.stepper}>
                       <TouchableOpacity
@@ -303,15 +312,6 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
                       </Text>
                       <ChevronDown size={11} color="#6B5344" />
                     </TouchableOpacity>
-                  </View>
-
-                  {/* HAVE badge — fixed width, doesn't affect layout */}
-                  <View style={styles.haveBadgeWrap}>
-                    {row.alreadyHave && (
-                      <View style={styles.haveBadge}>
-                        <Text style={styles.haveText}>HAVE</Text>
-                      </View>
-                    )}
                   </View>
 
                 </View>
@@ -510,6 +510,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 10,
   },
+  ingredientRowHave: {
+    backgroundColor: '#F2FAF4',
+  },
   ingredientDivider: {
     borderBottomWidth: 1,
     borderBottomColor: '#F0EAE0',
@@ -528,6 +531,16 @@ const styles = StyleSheet.create({
   checkboxChecked: {
     backgroundColor: '#D2691E',
     borderColor: '#D2691E',
+  },
+  checkboxHave: {
+    borderColor: '#4A9B6A',
+    backgroundColor: '#EBF5EE',
+  },
+  haveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#4A9B6A',
   },
   ingredientName: {
     flex: 1,
@@ -582,24 +595,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontWeight: '600',
     flex: 1,
-  },
-  haveBadgeWrap: {
-    width: 42,
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  haveBadge: {
-    backgroundColor: '#EBF5EE',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  haveText: {
-    fontSize: 10,
-    color: '#2D5A3D',
-    fontFamily: 'Inter_400Regular',
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
   pickerOverlay: {
     flex: 1,
