@@ -10,8 +10,11 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import { Mic, Plus, Check, ChevronDown, X } from 'lucide-react-native';
+import { Mic, Plus, Check, ChevronDown, X, Package } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { BundleList } from '@/components/BundleList';
+import { BundleSheet } from '@/components/BundleSheet';
+import type { Bundle } from '@/lib/bundles';
 
 type Ingredient = {
   id: string;
@@ -33,7 +36,10 @@ type ToastInfo = {
   unit: string;
 } | null;
 
+type Mode = 'single' | 'bundle';
+
 export function SmartAddBar({ onItemAdded }: Props) {
+  const [mode, setMode] = useState<Mode>('single');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Ingredient[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -44,6 +50,8 @@ export function SmartAddBar({ onItemAdded }: Props) {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastInfo>(null);
   const [toastVisible, setToastVisible] = useState(false);
+  const [selectedBundle, setSelectedBundle] = useState<Bundle | null>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -179,6 +187,33 @@ export function SmartAddBar({ onItemAdded }: Props) {
     onItemAdded();
   }
 
+  function handleSelectBundle(bundle: Bundle) {
+    setSelectedBundle(bundle);
+    setSheetVisible(true);
+  }
+
+  function handleSheetClose() {
+    setSheetVisible(false);
+  }
+
+  function handleBundleAdded() {
+    onItemAdded();
+    setMode('single');
+    showToast({
+      message: 'Bundle items added to your pantry.',
+      ingredientName: '',
+      quantity: 0,
+      unit: '',
+    });
+  }
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    if (next === 'single') {
+      handleClear();
+    }
+  }
+
   const allUnits = selected?.units ?? [];
 
   return (
@@ -186,103 +221,138 @@ export function SmartAddBar({ onItemAdded }: Props) {
       {toastVisible && (
         <Animated.View style={[styles.toast, { opacity: toastOpacity }]}>
           <Check size={14} color="#4A7C59" strokeWidth={2.5} />
-          <Text style={styles.toastText}>
-            {toast?.message}
-          </Text>
-          <TouchableOpacity onPress={handleUndo} style={styles.undoBtn}>
-            <Text style={styles.undoText}>Undo</Text>
-          </TouchableOpacity>
+          <Text style={styles.toastText}>{toast?.message}</Text>
+          {toast?.ingredientName ? (
+            <TouchableOpacity onPress={handleUndo} style={styles.undoBtn}>
+              <Text style={styles.undoText}>Undo</Text>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity onPress={dismissToast} style={styles.toastClose}>
             <X size={12} color="#4A7C59" />
           </TouchableOpacity>
         </Animated.View>
       )}
 
-      <View style={styles.container}>
-        {!selected ? (
-          <>
-            <View style={styles.searchRow}>
-              <TextInput
-                style={styles.input}
-                placeholder="Add an ingredient to your pantry..."
-                placeholderTextColor="#B8A898"
-                value={query}
-                onChangeText={setQuery}
-                returnKeyType="search"
-              />
-              <TouchableOpacity style={styles.micBtn}>
-                <Mic size={18} color="#D2691E" />
-              </TouchableOpacity>
-            </View>
-
-            {showDropdown && results.length > 0 && (
-              <View style={styles.dropdown}>
-                {results.map((ing, idx) => (
-                  <TouchableOpacity
-                    key={ing.id}
-                    style={[styles.dropdownItem, idx < results.length - 1 && styles.dropdownDivider]}
-                    onPress={() => handleSelect(ing)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.dropdownMain}>
-                      <Text style={styles.dropdownName}>{ing.name}</Text>
-                      <Text style={styles.dropdownCategory}>{ing.category}</Text>
-                    </View>
-                    <Text style={styles.dropdownUnits}>
-                      {ing.units.join(', ')}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </>
-        ) : (
-          <View style={styles.stepperRow}>
-            <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
-              <X size={14} color="#8C6A5A" />
-            </TouchableOpacity>
-
-            <Text style={styles.ingredientName}>{selected.name}</Text>
-
-            <View style={styles.stepperControls}>
-              <TouchableOpacity
-                style={styles.stepBtn}
-                onPress={() => setQuantity((q) => Math.max(1, q - 1))}
-              >
-                <Text style={styles.stepBtnText}>−</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.quantityText}>{quantity}</Text>
-
-              <TouchableOpacity
-                style={styles.stepBtn}
-                onPress={() => setQuantity((q) => q + 1)}
-              >
-                <Text style={styles.stepBtnText}>+</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={styles.unitSelector}
-              onPress={() => setShowUnitPicker(true)}
-            >
-              <Text style={styles.unitText}>{selectedUnit}</Text>
-              <ChevronDown size={13} color="#4A3728" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.saveBtn, saving && { opacity: 0.5 }]}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              <Check size={16} color="#fff" strokeWidth={2.5} />
-            </TouchableOpacity>
-          </View>
-        )}
+      {/* Mode Toggle */}
+      <View style={styles.toggleWrap}>
+        <TouchableOpacity
+          style={[styles.toggleBtn, mode === 'single' && styles.toggleBtnActive]}
+          onPress={() => switchMode('single')}
+          activeOpacity={0.8}
+        >
+          <Plus size={14} color={mode === 'single' ? '#D2691E' : '#9C7B6A'} strokeWidth={2.5} />
+          <Text style={[styles.toggleText, mode === 'single' && styles.toggleTextActive]}>
+            Single ingredient
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleBtn, mode === 'bundle' && styles.toggleBtnActive]}
+          onPress={() => switchMode('bundle')}
+          activeOpacity={0.8}
+        >
+          <Package size={14} color={mode === 'bundle' ? '#D2691E' : '#9C7B6A'} strokeWidth={2} />
+          <Text style={[styles.toggleText, mode === 'bundle' && styles.toggleTextActive]}>
+            Bundle
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <Modal visible={showUnitPicker} transparent animationType="fade" onRequestClose={() => setShowUnitPicker(false)}>
-        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowUnitPicker(false)}>
+      {mode === 'single' ? (
+        <View style={styles.container}>
+          {!selected ? (
+            <>
+              <View style={styles.searchRow}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Add an ingredient to your pantry..."
+                  placeholderTextColor="#B8A898"
+                  value={query}
+                  onChangeText={setQuery}
+                  returnKeyType="search"
+                />
+                <TouchableOpacity style={styles.micBtn}>
+                  <Mic size={18} color="#D2691E" />
+                </TouchableOpacity>
+              </View>
+
+              {showDropdown && results.length > 0 && (
+                <View style={styles.dropdown}>
+                  {results.map((ing, idx) => (
+                    <TouchableOpacity
+                      key={ing.id}
+                      style={[styles.dropdownItem, idx < results.length - 1 && styles.dropdownDivider]}
+                      onPress={() => handleSelect(ing)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.dropdownMain}>
+                        <Text style={styles.dropdownName}>{ing.name}</Text>
+                        <Text style={styles.dropdownCategory}>{ing.category}</Text>
+                      </View>
+                      <Text style={styles.dropdownUnits}>{ing.units.join(', ')}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
+          ) : (
+            <View style={styles.stepperRow}>
+              <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
+                <X size={14} color="#8C6A5A" />
+              </TouchableOpacity>
+
+              <Text style={styles.ingredientName}>{selected.name}</Text>
+
+              <View style={styles.stepperControls}>
+                <TouchableOpacity
+                  style={styles.stepBtn}
+                  onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+                >
+                  <Text style={styles.stepBtnText}>−</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.quantityText}>{quantity}</Text>
+
+                <TouchableOpacity
+                  style={styles.stepBtn}
+                  onPress={() => setQuantity((q) => q + 1)}
+                >
+                  <Text style={styles.stepBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.unitSelector}
+                onPress={() => setShowUnitPicker(true)}
+              >
+                <Text style={styles.unitText}>{selectedUnit}</Text>
+                <ChevronDown size={13} color="#4A3728" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveBtn, saving && { opacity: 0.5 }]}
+                onPress={handleSave}
+                disabled={saving}
+              >
+                <Check size={16} color="#fff" strokeWidth={2.5} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      ) : (
+        <BundleList onSelectBundle={handleSelectBundle} />
+      )}
+
+      <Modal
+        visible={showUnitPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowUnitPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerOverlay}
+          activeOpacity={1}
+          onPress={() => setShowUnitPicker(false)}
+        >
           <View style={styles.pickerCard}>
             <Text style={styles.pickerTitle}>Select Unit</Text>
             <ScrollView>
@@ -292,7 +362,9 @@ export function SmartAddBar({ onItemAdded }: Props) {
                   style={[styles.pickerOption, u === selectedUnit && styles.pickerOptionSelected]}
                   onPress={() => { setSelectedUnit(u); setShowUnitPicker(false); }}
                 >
-                  <Text style={[styles.pickerOptionText, u === selectedUnit && styles.pickerOptionTextSelected]}>
+                  <Text
+                    style={[styles.pickerOptionText, u === selectedUnit && styles.pickerOptionTextSelected]}
+                  >
                     {u}
                   </Text>
                   {u === selectedUnit && <Check size={14} color="#D2691E" />}
@@ -302,6 +374,13 @@ export function SmartAddBar({ onItemAdded }: Props) {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <BundleSheet
+        bundle={selectedBundle}
+        visible={sheetVisible}
+        onClose={handleSheetClose}
+        onAdded={handleBundleAdded}
+      />
     </View>
   );
 }
@@ -310,6 +389,7 @@ const styles = StyleSheet.create({
   wrapper: {
     paddingHorizontal: 16,
     paddingBottom: 8,
+    paddingTop: 8,
     gap: 8,
   },
   toast: {
@@ -341,6 +421,39 @@ const styles = StyleSheet.create({
   },
   toastClose: {
     padding: 2,
+  },
+  toggleWrap: {
+    flexDirection: 'row',
+    backgroundColor: '#EDE7DC',
+    borderRadius: 14,
+    padding: 3,
+    gap: 2,
+  },
+  toggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 11,
+    gap: 6,
+  },
+  toggleBtnActive: {
+    backgroundColor: '#FFFAF5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  toggleText: {
+    fontSize: 13,
+    color: '#9C7B6A',
+    fontFamily: 'Inter_400Regular',
+    fontWeight: '600',
+  },
+  toggleTextActive: {
+    color: '#2C1810',
   },
   container: {
     backgroundColor: '#F5EFE6',
