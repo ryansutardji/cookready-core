@@ -78,22 +78,6 @@ export function RecipeCard({ recipe, onCooked }: Props) {
             {recipe.servings}
           </Text>
         </View>
-        <TouchableOpacity
-          onPress={handleSave}
-          disabled={saveState === 'saving' || saveState === 'saved'}
-          style={styles.saveBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          {saveState === 'saving' ? (
-            <ActivityIndicator size="small" color="#D2691E" />
-          ) : (
-            <Bookmark
-              size={18}
-              color="#D2691E"
-              fill={saveState === 'saved' ? '#D2691E' : 'transparent'}
-            />
-          )}
-        </TouchableOpacity>
       </View>
 
       <View style={styles.body}>
@@ -143,6 +127,24 @@ export function RecipeCard({ recipe, onCooked }: Props) {
           </View>
         )}
 
+        {(cookState === 'error' || saveState === 'error') && (
+          <View style={styles.errorBanner}>
+            <AlertCircle size={14} color="#ef4444" />
+            <Text style={[styles.errorText, { fontFamily: 'Inter_400Regular' }]}>
+              {cookState === 'error' ? errorMsg : saveError}
+            </Text>
+          </View>
+        )}
+
+        {cookState === 'success' && (
+          <View style={styles.successBanner}>
+            <CheckCircle size={16} color="#708238" />
+            <Text style={[styles.successText, { fontFamily: 'Inter_400Regular' }]}>
+              Pantry updated! Enjoy your meal.
+            </Text>
+          </View>
+        )}
+
         {saveState === 'saved' && (
           <View style={styles.saveBanner}>
             <Bookmark size={13} color="#708238" fill="#708238" />
@@ -151,32 +153,11 @@ export function RecipeCard({ recipe, onCooked }: Props) {
             </Text>
           </View>
         )}
+      </View>
 
-        {saveState === 'error' && (
-          <View style={styles.errorBanner}>
-            <AlertCircle size={14} color="#ef4444" />
-            <Text style={[styles.errorText, { fontFamily: 'Inter_400Regular' }]}>
-              {saveError}
-            </Text>
-          </View>
-        )}
-
-        {cookState === 'error' && (
-          <View style={styles.errorBanner}>
-            <AlertCircle size={14} color="#ef4444" />
-            <Text style={[styles.errorText, { fontFamily: 'Inter_400Regular' }]}>
-              {errorMsg}
-            </Text>
-          </View>
-        )}
-
+      <View style={styles.actionRow}>
         {cookState === 'success' ? (
-          <View style={styles.successBanner}>
-            <CheckCircle size={16} color="#708238" />
-            <Text style={[styles.successText, { fontFamily: 'Inter_400Regular' }]}>
-              Pantry updated! Enjoy your meal.
-            </Text>
-          </View>
+          <View style={styles.actionRowSuccess} />
         ) : (
           <TouchableOpacity
             onPress={handleCookThis}
@@ -193,6 +174,33 @@ export function RecipeCard({ recipe, onCooked }: Props) {
             </Text>
           </TouchableOpacity>
         )}
+
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={saveState === 'saving' || saveState === 'saved'}
+          style={[styles.saveActionBtn, saveState === 'saved' && styles.saveActionBtnSaved]}
+          activeOpacity={0.75}
+        >
+          {saveState === 'saving' ? (
+            <ActivityIndicator size="small" color="#D2691E" />
+          ) : (
+            <>
+              <Bookmark
+                size={15}
+                color={saveState === 'saved' ? '#708238' : '#D2691E'}
+                fill={saveState === 'saved' ? '#708238' : 'transparent'}
+              />
+              <Text
+                style={[
+                  styles.saveActionBtnText,
+                  { fontFamily: 'Inter_400Regular', color: saveState === 'saved' ? '#708238' : '#D2691E' },
+                ]}
+              >
+                {saveState === 'saved' ? 'Saved' : 'Save Recipe'}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -333,16 +341,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 13,
   },
-  cookBtn: {
-    marginTop: 12,
-    backgroundColor: '#D2691E',
-    borderRadius: 10,
+  actionRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#F0E6D8',
+    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  actionRowSuccess: {
+    flex: 1,
+  },
+  cookBtn: {
+    flex: 1,
+    backgroundColor: '#D2691E',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -354,12 +373,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13,
   },
-  saveBtn: {
-    marginLeft: 4,
-    width: 28,
-    height: 28,
+  saveActionBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#D2691E',
+    backgroundColor: 'transparent',
+  },
+  saveActionBtnSaved: {
+    borderColor: '#708238',
+    backgroundColor: 'rgba(112,130,56,0.08)',
+  },
+  saveActionBtnText: {
+    fontWeight: '700',
+    fontSize: 13,
   },
   saveBanner: {
     flexDirection: 'row',
