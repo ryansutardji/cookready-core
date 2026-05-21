@@ -57,9 +57,30 @@ export default function RootLayout() {
     if (!isNavigationReady || !isAppReady) return;
 
     // Use a small timeout to ensure the native stack has painted
-    const timeout = setTimeout(() => {
+    const timeout = setTimeout(async () => {
       if (session) {
-        router.replace('/(tabs)/pantry');
+        const [profileResult, pantryResult] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('onboarding_completed')
+            .eq('id', session.user.id)
+            .maybeSingle(),
+          supabase
+            .from('user_pantry')
+            .select('id', { count: 'exact', head: true })
+            .gt('current_quantity_value', 0),
+        ]);
+
+        const onboardingCompleted = profileResult.data?.onboarding_completed === true;
+        const pantryCount = pantryResult.count ?? 0;
+
+        if (onboardingCompleted) {
+          router.replace('/(tabs)/pantry');
+        } else if (pantryCount > 0) {
+          router.replace('/(onboarding)/build-pantry');
+        } else {
+          router.replace('/(onboarding)/welcome');
+        }
       } else {
         router.replace('/(auth)');
       }
@@ -74,6 +95,7 @@ export default function RootLayout() {
     <>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(onboarding)" />
         <Stack.Screen name="(tabs)" />
       </Stack>
       <StatusBar style="dark" />
