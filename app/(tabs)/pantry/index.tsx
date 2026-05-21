@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { LogOut, RefreshCw } from 'lucide-react-native';
+import { Settings, RefreshCw } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import type { PantryItem, PantryCategory as PantryCategoryType } from '@/lib/supabase';
 import { PantryCategory } from '@/components/PantryCategory';
@@ -112,10 +112,6 @@ export default function PantryScreen() {
     }, [])
   );
 
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-  }
-
   function handleRefresh() {
     setRefreshing(true);
     fetchPantry();
@@ -165,10 +161,10 @@ export default function PantryScreen() {
               <RefreshCw size={16} color="#4A3728" />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={handleSignOut}
+              onPress={() => router.push('/(tabs)/settings')}
               className="w-9 h-9 rounded-full bg-stone items-center justify-center"
             >
-              <LogOut size={16} color="#4A3728" />
+              <Settings size={16} color="#4A3728" />
             </TouchableOpacity>
           </View>
         </View>
