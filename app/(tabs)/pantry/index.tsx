@@ -5,11 +5,9 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Settings, RefreshCw } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import type { PantryItem, PantryCategory as PantryCategoryType } from '@/lib/supabase';
 import { PantryCategory } from '@/components/PantryCategory';
@@ -30,18 +28,11 @@ export default function PantryScreen() {
   const router = useRouter();
   const [categories, setCategories] = useState<PantryCategoryType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [userEmail, setUserEmail] = useState('');
 
   async function fetchPantry() {
     setError('');
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user?.email) setUserEmail(user.email);
-
       const [pantryResult, globalConvResult] = await Promise.all([
         supabase
           .from('user_pantry')
@@ -101,7 +92,6 @@ export default function PantryScreen() {
       setError(err.message ?? 'Failed to load pantry.');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }
 
@@ -111,11 +101,6 @@ export default function PantryScreen() {
       fetchPantry();
     }, [])
   );
-
-  function handleRefresh() {
-    setRefreshing(true);
-    fetchPantry();
-  }
 
   function handleItemPress(item: PantryItem) {
     router.push({
@@ -136,38 +121,12 @@ export default function PantryScreen() {
   return (
     <View className="flex-1 bg-cream">
       <View className="bg-cream pt-10 pb-3 px-6 shadow-sm border-b border-[#E8E0D0]">
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text
-              className="text-espresso text-2xl"
-              style={{ fontFamily: 'NotoSerif_700Bold' }}
-            >
-              My Pantry
-            </Text>
-            {userEmail ? (
-              <Text
-                className="text-espresso/50 text-xs mt-0.5"
-                style={{ fontFamily: 'Inter_400Regular' }}
-              >
-                {userEmail}
-              </Text>
-            ) : null}
-          </View>
-          <View className="flex-row items-center gap-3">
-            <TouchableOpacity
-              onPress={handleRefresh}
-              className="w-9 h-9 rounded-full bg-stone items-center justify-center"
-            >
-              <RefreshCw size={16} color="#4A3728" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push('/(tabs)/settings')}
-              className="w-9 h-9 rounded-full bg-stone items-center justify-center"
-            >
-              <Settings size={16} color="#4A3728" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <Text
+          className="text-espresso text-2xl"
+          style={{ fontFamily: 'NotoSerif_700Bold' }}
+        >
+          My Pantry
+        </Text>
 
         {!loading && (
           <View className="flex-row gap-4 mt-3">
@@ -211,7 +170,7 @@ export default function PantryScreen() {
 
       <SmartAddBar onItemAdded={fetchPantry} />
 
-      {loading && !refreshing ? (
+      {loading ? (
         <View className="flex-1 items-center justify-center gap-3">
           <ActivityIndicator size="large" color="#D2691E" />
           <Text
@@ -231,7 +190,7 @@ export default function PantryScreen() {
             {error}
           </Text>
           <TouchableOpacity
-            onPress={handleRefresh}
+            onPress={fetchPantry}
             className="mt-4 bg-terracotta rounded-xl px-6 py-3"
           >
             <Text className="text-white font-semibold" style={{ fontFamily: 'Inter_400Regular' }}>
@@ -260,13 +219,6 @@ export default function PantryScreen() {
           className="flex-1"
           contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor="#D2691E"
-            />
-          }
         >
           {categories.map((cat) => (
             <PantryCategory key={cat.category} category={cat} onItemPress={handleItemPress} />
