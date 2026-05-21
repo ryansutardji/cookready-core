@@ -40,19 +40,14 @@ type MeterSlot = {
 };
 
 const METER_SLOTS: MeterSlot[] = [
-  { key: 'protein',    label: 'Protein',     icon: '🥩', required: true,  minCount: 1, categories: ['Meat', 'Seafood'] },
-  { key: 'vegetable',  label: 'Vegetable',   icon: '🥦', required: true,  minCount: 1, categories: ['Produce'] },
-  { key: 'grain',      label: 'Grain',       icon: '🌾', required: true,  minCount: 1, categories: ['Grains'] },
-  { key: 'spice',      label: 'Spice/Sauce', icon: '🌶️', required: true,  minCount: 5, categories: ['Spices', 'Condiments', 'Pantry'] },
-  { key: 'oil',        label: 'Oil',         icon: '🫒', required: true,  minCount: 1, categories: ['Condiments', 'Pantry'] },
-  { key: 'fruit',      label: 'Fruit',       icon: '🍓', required: false, minCount: 1, categories: ['Produce'] },
-  { key: 'baking',     label: 'Baking',      icon: '🥣', required: false, minCount: 1, categories: ['Bakery', 'Pantry'] },
+  { key: 'protein',   label: 'Protein',     icon: '🥩', required: true,  minCount: 1, categories: ['Protein'] },
+  { key: 'vegetable', label: 'Vegetable',   icon: '🥦', required: true,  minCount: 1, categories: ['Vegetable'] },
+  { key: 'grain',     label: 'Grain',       icon: '🌾', required: true,  minCount: 1, categories: ['Grain'] },
+  { key: 'spice',     label: 'Spice/Sauce', icon: '🌶️', required: true,  minCount: 5, categories: ['Spice/Sauce'] },
+  { key: 'oil',       label: 'Oil',         icon: '🫒', required: true,  minCount: 1, categories: ['Oil', 'Fat'] },
+  { key: 'fruit',     label: 'Fruit',       icon: '🍓', required: false, minCount: 1, categories: ['Fruit'] },
+  { key: 'baking',    label: 'Baking',      icon: '🥣', required: false, minCount: 1, categories: ['Baking'] },
 ];
-
-// Oil detection: ingredient names that count as oil
-const OIL_KEYWORDS = ['oil', 'butter', 'ghee', 'lard', 'shortening', 'margarine', 'fat'];
-// Fruit detection: ingredient names that count as fruit (produce items that are fruit)
-const FRUIT_KEYWORDS = ['apple', 'banana', 'berry', 'berries', 'orange', 'lemon', 'lime', 'grape', 'mango', 'peach', 'pear', 'pineapple', 'strawberry', 'blueberry', 'raspberry', 'cherry', 'watermelon', 'melon', 'kiwi', 'avocado', 'tomato'];
 
 type PantrySnapshot = { name: string; category: string }[];
 
@@ -63,24 +58,12 @@ function computeMeterCounts(pantry: PantrySnapshot): Record<string, number> {
 
   for (const item of pantry) {
     const cat = item.category;
-    const nameLower = item.name.toLowerCase();
-
-    // Oil — check by name keyword across condiment/pantry categories
-    if (['Condiments', 'Pantry'].includes(cat) && OIL_KEYWORDS.some(k => nameLower.includes(k))) {
-      counts.oil++;
-      continue;
+    for (const slot of METER_SLOTS) {
+      if (slot.categories.includes(cat)) {
+        counts[slot.key]++;
+        break;
+      }
     }
-    // Fruit — produce items with fruit keywords
-    if (cat === 'Produce' && FRUIT_KEYWORDS.some(k => nameLower.includes(k))) {
-      counts.fruit++;
-      continue;
-    }
-
-    if (['Meat', 'Seafood'].includes(cat)) counts.protein++;
-    else if (cat === 'Produce') counts.vegetable++;
-    else if (cat === 'Grains') counts.grain++;
-    else if (['Spices', 'Condiments', 'Pantry'].includes(cat)) counts.spice++;
-    else if (['Bakery'].includes(cat)) counts.baking++;
   }
 
   return counts;
