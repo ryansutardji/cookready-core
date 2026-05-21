@@ -62,7 +62,7 @@ export default function RootLayout() {
         const [profileResult, pantryResult] = await Promise.all([
           supabase
             .from('profiles')
-            .select('onboarding_completed')
+            .select('has_completed_onboarding')
             .eq('id', session.user.id)
             .maybeSingle(),
           supabase
@@ -71,7 +71,7 @@ export default function RootLayout() {
             .gt('current_quantity_value', 0),
         ]);
 
-        const onboardingCompleted = profileResult.data?.onboarding_completed === true;
+        const onboardingCompleted = profileResult.data?.has_completed_onboarding === true;
         const pantryCount = pantryResult.count ?? 0;
 
         if (onboardingCompleted) {

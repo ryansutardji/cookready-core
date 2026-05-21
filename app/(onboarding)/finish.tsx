@@ -25,7 +25,7 @@ export default function FinishScreen() {
       if (user) {
         await supabase
           .from('profiles')
-          .update({ onboarding_completed: true })
+          .update({ has_completed_onboarding: true })
           .eq('id', user.id);
       }
     } catch {
