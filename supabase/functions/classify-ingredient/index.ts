@@ -8,47 +8,37 @@ const corsHeaders = {
 
 const CATEGORIES = ['Protein', 'Vegetable', 'Fruit', 'Grain', 'Oil', 'Fat', 'Dairy', 'Baking', 'Spice/Sauce', 'Pantry'];
 
-// Units available per category group
-const CATEGORY_UNITS: Record<string, string[]> = {
-  Protein:      ['each', 'oz', 'lb', 'g', 'kg', 'piece', 'fillet', 'breast', 'slice'],
-  Vegetable:    ['each', 'oz', 'lb', 'g', 'bunch', 'head', 'stalk', 'cup', 'handful'],
-  Fruit:        ['each', 'oz', 'lb', 'g', 'cup', 'handful', 'bunch', 'slice'],
-  Grain:        ['cup', 'oz', 'lb', 'g', 'kg', 'tbsp', 'tsp', 'piece', 'slice'],
-  Oil:          ['tbsp', 'tsp', 'cup', 'fl oz', 'ml', 'L'],
-  Fat:          ['tbsp', 'tsp', 'cup', 'oz', 'lb', 'g', 'stick'],
-  Dairy:        ['cup', 'fl oz', 'ml', 'oz', 'lb', 'g', 'tbsp', 'tsp', 'slice', 'each'],
-  Baking:       ['cup', 'oz', 'lb', 'g', 'tbsp', 'tsp', 'each', 'pinch'],
-  'Spice/Sauce':['tsp', 'tbsp', 'cup', 'oz', 'g', 'fl oz', 'ml', 'pinch', 'dash'],
-  Pantry:       ['each', 'oz', 'lb', 'g', 'cup', 'tbsp', 'tsp', 'can', 'bottle', 'bag', 'fl oz', 'ml'],
-};
-
-// Units that are "universal" — global unit_conversions rows exist for these,
-// so no ingredient-specific conversion row is needed
+// Units that exist in the DB as base_unit or preferred_unit on universal ingredients,
+// or as input_unit in unit_conversions — kept in sync with the DB.
 const UNIVERSAL_UNITS = new Set([
-  'oz', 'lb', 'g', 'kg', 'cup', 'tbsp', 'tsp', 'fl oz', 'ml', 'L', 'stick', 'pinch', 'dash',
+  'oz', 'lb', 'g', 'ml', 'cup', 'tbsp', 'tsp', 'pint', 'stick',
 ]);
 
-const SYSTEM_PROMPT = `You are an ingredient classification assistant for a cooking pantry app.
+function buildSystemPrompt(validUnits: string[]): string {
+  const unitList = validUnits.map(u => `"${u}"`).join(', ');
+  return `You are an ingredient classification assistant for a cooking pantry app.
 
 Given an ingredient name, respond with ONLY a JSON object (no markdown, no extra text) with these fields:
 
 {
   "category": one of [${CATEGORIES.map(c => `"${c}"`).join(', ')}],
-  "preferred_unit": the most natural unit home cooks use for this ingredient (e.g. "each" for whole fruits/veg, "oz" for meats, "cup" for grains/liquids),
-  "base_unit": the canonical measurement unit that conversions are expressed in (usually a weight like "g" or volume like "ml", or "each" for count-based items),
-  "conversion_value": if preferred_unit is NOT a standard metric/imperial unit (i.e. it's something like "each", "bunch", "head", "fillet"), provide an estimated numeric value representing how many grams or ml 1 preferred_unit equals. If preferred_unit IS a standard unit (oz, lb, g, kg, cup, tbsp, tsp, fl oz, ml, L), set this to null,
+  "preferred_unit": the most natural unit home cooks use for this ingredient. MUST be one of: [${unitList}],
+  "base_unit": the canonical measurement unit that conversions are expressed in. MUST also be one of: [${unitList}],
+  "conversion_value": if preferred_unit is NOT a standard metric/imperial unit (i.e. not oz, lb, g, ml, cup, tbsp, tsp, pint, stick), provide an estimated numeric value representing how many grams or ml 1 preferred_unit equals. Otherwise set to null,
   "conversion_to_unit": the unit that conversion_value converts to (usually "g" for solids, "ml" for liquids). Set to null if conversion_value is null.
 }
 
 Rules:
+- preferred_unit and base_unit MUST be chosen from the provided unit list — never invent new units
 - Be practical — home pantry context, not restaurant
-- For whole produce (apple, dragonfruit, onion), preferred_unit is usually "each"
+- For whole produce, preferred_unit is usually "count" or the ingredient's own name unit if present in the list
 - For meats/fish, preferred_unit is usually "oz" or "lb"
 - For liquids (oils, sauces), preferred_unit is usually "tbsp" or "cup"
 - For spices, preferred_unit is usually "tsp"
 - For grains/flour, preferred_unit is usually "cup"
-- Estimate conversion_value based on typical specimen weight (e.g. 1 apple ≈ 182g, 1 bunch basil ≈ 30g)
-- Only provide conversion_value when preferred_unit is non-standard`;
+- Estimate conversion_value based on typical specimen weight (e.g. 1 bunch basil ≈ 30g)
+- Only provide conversion_value when preferred_unit is non-standard (not in the standard metric/imperial list above)`;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -65,7 +55,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { ingredient_name } = body as { ingredient_name: string };
+    const { ingredient_name, valid_units } = body as {
+      ingredient_name: string;
+      valid_units?: string[];
+    };
 
     if (!ingredient_name?.trim()) {
       return new Response(
@@ -74,17 +67,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const units = valid_units && valid_units.length > 0 ? valid_units : [];
+
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const result = await model.generateContent([
-      SYSTEM_PROMPT,
+      buildSystemPrompt(units),
       `Classify this ingredient: "${ingredient_name.trim()}"`,
     ]);
 
     const rawText = result.response.text().trim();
-
-    // Strip markdown code fences if present
     const jsonText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 
     let parsed: {
@@ -104,15 +97,19 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Validate category falls within known set; default to Pantry
     if (!CATEGORIES.includes(parsed.category)) {
       parsed.category = 'Pantry';
     }
 
-    // Attach the valid units for the returned category
-    const available_units = CATEGORY_UNITS[parsed.category] ?? CATEGORY_UNITS['Pantry'];
+    // Clamp preferred_unit to the valid set if provided
+    const validSet = new Set(units);
+    if (units.length > 0 && !validSet.has(parsed.preferred_unit)) {
+      parsed.preferred_unit = units[0];
+    }
+    if (units.length > 0 && !validSet.has(parsed.base_unit)) {
+      parsed.base_unit = parsed.preferred_unit;
+    }
 
-    // Determine whether this needs a custom conversion row
     const needs_custom_conversion = !UNIVERSAL_UNITS.has(parsed.preferred_unit);
 
     return new Response(
@@ -122,7 +119,6 @@ Deno.serve(async (req: Request) => {
         base_unit: parsed.base_unit,
         conversion_value: parsed.conversion_value,
         conversion_to_unit: parsed.conversion_to_unit,
-        available_units,
         needs_custom_conversion,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
