@@ -8,6 +8,20 @@ const corsHeaders = {
 
 const CATEGORIES = ['Protein', 'Vegetable', 'Fruit', 'Grain', 'Oil', 'Fat', 'Dairy', 'Baking', 'Spice/Sauce', 'Pantry'];
 
+// Per-category units derived from DB (base_unit + preferred_unit of universal ingredients + their unit_conversion input_units)
+const CATEGORY_UNITS: Record<string, string[]> = {
+  Baking:        ['bag', 'bar', 'bottle', 'box', 'can', 'container', 'cup', 'g', 'jar', 'ml', 'packet', 'tbsp', 'tsp'],
+  Dairy:         ['bag', 'ball', 'block', 'bottle', 'can', 'carton', 'container', 'count', 'g', 'log', 'ml', 'pack', 'stick', 'tub', 'wedge', 'wheel'],
+  Fat:           ['block', 'g', 'jar', 'tub'],
+  Fruit:         ['apple', 'bag', 'banana', 'box', 'container', 'count', 'g', 'mango', 'peach', 'pear', 'unit'],
+  Grain:         ['bag', 'box', 'bundle', 'container', 'cup', 'g', 'pack'],
+  Oil:           ['bottle', 'jar', 'large_bottle', 'ml'],
+  Protein:       ['count', 'dozen', 'g', 'lb'],
+  'Spice/Sauce': ['bag', 'bottle', 'box', 'can', 'container', 'g', 'jar', 'leaf', 'ml', 'packet', 'tbsp', 'tsp', 'tub'],
+  Vegetable:     ['bag', 'bulb', 'bunch', 'carrot', 'clove', 'container', 'count', 'ear', 'g', 'head', 'knob', 'onion', 'pepper', 'pint', 'potato', 'shallot', 'stalk', 'tomato', 'unit'],
+  Pantry:        ['bag', 'bar', 'bottle', 'box', 'can', 'container', 'count', 'g', 'jar', 'ml', 'pack', 'packet', 'tub'],
+};
+
 // Units that exist in the DB as base_unit or preferred_unit on universal ingredients,
 // or as input_unit in unit_conversions — kept in sync with the DB.
 const UNIVERSAL_UNITS = new Set([

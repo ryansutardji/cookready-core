@@ -36,26 +36,34 @@ type ClassifyResult = {
   needs_custom_conversion: boolean;
 };
 
-async function fetchValidUnits(): Promise<string[]> {
+async function fetchUnitsByCategory(): Promise<Record<string, string[]>> {
   const [ingResult, ucResult] = await Promise.all([
     supabase
       .from('ingredients')
-      .select('base_unit, preferred_unit')
+      .select('category, base_unit, preferred_unit')
       .is('user_id', null),
     supabase
       .from('unit_conversions')
-      .select('input_unit'),
+      .select('input_unit, ingredient_id, ingredients!inner(category, user_id)')
+      .is('ingredients.user_id', null),
   ]);
 
-  const units = new Set<string>();
+  const map: Record<string, Set<string>> = {};
   for (const row of ingResult.data ?? []) {
-    if (row.base_unit) units.add(row.base_unit);
-    if (row.preferred_unit) units.add(row.preferred_unit);
+    if (!row.category) continue;
+    if (!map[row.category]) map[row.category] = new Set();
+    if (row.base_unit) map[row.category].add(row.base_unit);
+    if (row.preferred_unit) map[row.category].add(row.preferred_unit);
   }
-  for (const row of ucResult.data ?? []) {
-    if (row.input_unit) units.add(row.input_unit);
+  for (const row of (ucResult.data ?? []) as any[]) {
+    const cat = row.ingredients?.category;
+    if (!cat) continue;
+    if (!map[cat]) map[cat] = new Set();
+    if (row.input_unit) map[cat].add(row.input_unit);
   }
-  return Array.from(units).sort();
+  return Object.fromEntries(
+    Object.entries(map).map(([cat, set]) => [cat, Array.from(set).sort()])
+  );
 }
 
 type Props = {
@@ -76,6 +84,7 @@ export function NewIngredientExpansion({ ingredientName, onSave, onCancel, savin
   const [classifying, setClassifying] = useState(true);
   const [classifyError, setClassifyError] = useState('');
 
+  const [unitsByCategory, setUnitsByCategory] = useState<Record<string, string[]>>({});
   const [selectedCategory, setSelectedCategory] = useState<Category>('Pantry');
   const [availableUnits, setAvailableUnits] = useState<string[]>([]);
   const [selectedUnit, setSelectedUnit] = useState('');
@@ -99,12 +108,16 @@ export function NewIngredientExpansion({ ingredientName, onSave, onCancel, savin
     setClassifying(true);
     setClassifyError('');
     try {
-      const [validUnits, session] = await Promise.all([
-        fetchValidUnits(),
+      const [categoryUnits, session] = await Promise.all([
+        fetchUnitsByCategory(),
         supabase.auth.getSession().then(r => r.data.session),
       ]);
 
+      setUnitsByCategory(categoryUnits);
       const token = session?.access_token ?? SUPABASE_ANON_KEY;
+
+      // Flatten all units so the AI can suggest from any of them
+      const allUnits = Array.from(new Set(Object.values(categoryUnits).flat())).sort();
 
       const res = await fetch(`${SUPABASE_URL}/functions/v1/classify-ingredient`, {
         method: 'POST',
@@ -113,7 +126,7 @@ export function NewIngredientExpansion({ ingredientName, onSave, onCancel, savin
           'Authorization': `Bearer ${token}`,
           'Apikey': SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ ingredient_name: ingredientName, valid_units: validUnits }),
+        body: JSON.stringify({ ingredient_name: ingredientName, valid_units: allUnits }),
       });
 
       const result: ClassifyResult = await res.json();
@@ -122,13 +135,14 @@ export function NewIngredientExpansion({ ingredientName, onSave, onCancel, savin
         ? (result.category as Category)
         : 'Pantry';
 
+      const catUnits = categoryUnits[cat] ?? allUnits;
       setSelectedCategory(cat);
       setAiSuggestedCategory(cat);
-      setAvailableUnits(validUnits);
+      setAvailableUnits(catUnits);
 
-      const unit = validUnits.includes(result.preferred_unit)
+      const unit = catUnits.includes(result.preferred_unit)
         ? result.preferred_unit
-        : validUnits[0] ?? 'count';
+        : catUnits[0] ?? 'count';
       setSelectedUnit(unit);
       setAiSuggestedUnit(unit);
 
@@ -139,11 +153,7 @@ export function NewIngredientExpansion({ ingredientName, onSave, onCancel, savin
         setConversionToUnit(result.conversion_to_unit as 'g' | 'ml' | 'count');
       }
     } catch {
-      const fallback = await fetchValidUnits().catch(() => ['count', 'oz', 'lb', 'g', 'cup', 'tbsp', 'tsp']);
       setClassifyError('Could not reach AI. Pick category and unit manually.');
-      setSelectedCategory('Pantry');
-      setAvailableUnits(fallback);
-      setSelectedUnit(fallback[0] ?? 'count');
     } finally {
       setClassifying(false);
     }
@@ -151,6 +161,11 @@ export function NewIngredientExpansion({ ingredientName, onSave, onCancel, savin
 
   function handleCategorySelect(cat: Category) {
     setSelectedCategory(cat);
+    const units = unitsByCategory[cat] ?? [];
+    setAvailableUnits(units);
+    if (!units.includes(selectedUnit)) {
+      setSelectedUnit(units[0] ?? '');
+    }
     setConversionConfirmed(false);
   }
 
