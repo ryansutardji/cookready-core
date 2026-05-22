@@ -10,10 +10,11 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import { Mic, Plus, Check, ChevronDown, X, Package } from 'lucide-react-native';
+import { Mic, Plus, Check, ChevronDown, X, Package, Sparkles } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { BundleList } from '@/components/BundleList';
 import { BundleSheet } from '@/components/BundleSheet';
+import { NewIngredientExpansion } from '@/components/NewIngredientExpansion';
 import type { Bundle } from '@/lib/bundles';
 
 type Ingredient = {
@@ -43,6 +44,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Ingredient[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [noResults, setNoResults] = useState(false);
   const [selected, setSelected] = useState<Ingredient | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState('');
@@ -52,6 +54,9 @@ export function SmartAddBar({ onItemAdded }: Props) {
   const [toastVisible, setToastVisible] = useState(false);
   const [selectedBundle, setSelectedBundle] = useState<Bundle | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
+  // Net-new ingredient state
+  const [showNewIngredient, setShowNewIngredient] = useState(false);
+  const [newIngredientName, setNewIngredientName] = useState('');
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -59,19 +64,28 @@ export function SmartAddBar({ onItemAdded }: Props) {
     if (!text.trim()) {
       setResults([]);
       setShowDropdown(false);
+      setNoResults(false);
       return;
     }
-    const { data } = await supabase.rpc
-      ? await (async () => {
-          const { data } = await supabase
-            .from('ingredients')
-            .select('id, name, category, base_unit, preferred_unit')
-            .ilike('name', `%${text}%`)
-            .order('name')
-            .limit(8);
-          return { data };
-        })()
-      : { data: [] };
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id ?? null;
+
+    // Fetch ingredients visible to this user: universal (user_id IS NULL) or their own
+    let query = supabase
+      .from('ingredients')
+      .select('id, name, category, base_unit, preferred_unit, user_id')
+      .ilike('name', `%${text}%`)
+      .order('name')
+      .limit(8);
+
+    if (userId) {
+      query = query.or(`user_id.is.null,user_id.eq.${userId}`);
+    } else {
+      query = query.is('user_id', null);
+    }
+
+    const { data } = await query;
 
     if (data && data.length > 0) {
       const ids = data.map((d: any) => d.id);
@@ -104,10 +118,12 @@ export function SmartAddBar({ onItemAdded }: Props) {
       });
 
       setResults(enriched);
+      setNoResults(false);
       setShowDropdown(true);
     } else {
       setResults([]);
-      setShowDropdown(false);
+      setNoResults(true);
+      setShowDropdown(true);
     }
   }, []);
 
@@ -130,8 +146,75 @@ export function SmartAddBar({ onItemAdded }: Props) {
     setQuery('');
     setResults([]);
     setShowDropdown(false);
+    setNoResults(false);
     setQuantity(1);
     setSelectedUnit('');
+    setShowNewIngredient(false);
+    setNewIngredientName('');
+  }
+
+  function handleAddAsNew() {
+    setShowNewIngredient(true);
+    setNewIngredientName(query.trim());
+    setShowDropdown(false);
+  }
+
+  async function handleSaveNewIngredient(ingredient: {
+    name: string;
+    category: string;
+    preferred_unit: string;
+    base_unit: string;
+    conversion_value: number | null;
+    conversion_to_unit: string | null;
+  }) {
+    setSaving(true);
+    try {
+      // Insert the new ingredient row with the current user's id
+      const { data: newIng, error: ingError } = await supabase
+        .from('ingredients')
+        .insert({
+          name: ingredient.name,
+          category: ingredient.category,
+          preferred_unit: ingredient.preferred_unit,
+          base_unit: ingredient.base_unit,
+        })
+        .select('id')
+        .single();
+
+      if (ingError) throw ingError;
+
+      // Insert a unit conversion row only for non-standard (custom) units
+      if (ingredient.conversion_value != null && ingredient.conversion_to_unit) {
+        const toUnit = ingredient.conversion_to_unit === 'count' ? 'each' : ingredient.conversion_to_unit;
+        await supabase.from('unit_conversions').insert({
+          ingredient_id: newIng.id,
+          input_unit: ingredient.preferred_unit,
+          output_value: ingredient.conversion_value,
+          output_unit: toUnit,
+        });
+      }
+
+      // Add to the user's pantry
+      await supabase.rpc('add_pantry_item', {
+        p_ingredient_name: ingredient.name,
+        p_quantity: 1,
+        p_unit: ingredient.preferred_unit,
+      });
+
+      handleClear();
+      onItemAdded();
+      showToast({
+        message: `${ingredient.name} added to your pantry.`,
+        ingredientName: ingredient.name,
+        quantity: 1,
+        unit: ingredient.preferred_unit,
+      });
+    } catch (err: any) {
+      // Surface error without crashing
+      console.error('Failed to save new ingredient:', err?.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleSave() {
@@ -209,9 +292,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
 
   function switchMode(next: Mode) {
     setMode(next);
-    if (next === 'single') {
-      handleClear();
-    }
+    handleClear();
   }
 
   const allUnits = selected?.units ?? [];
@@ -258,8 +339,9 @@ export function SmartAddBar({ onItemAdded }: Props) {
       </View>
 
       {mode === 'single' ? (
-        <View style={styles.container}>
-          {!selected ? (
+        <>
+        <View style={[styles.container, showNewIngredient && styles.containerNewIngredient]}>
+          {!selected && !showNewIngredient ? (
             <>
               <View style={styles.searchRow}>
                 <TextInput
@@ -275,12 +357,15 @@ export function SmartAddBar({ onItemAdded }: Props) {
                 </TouchableOpacity>
               </View>
 
-              {showDropdown && results.length > 0 && (
+              {showDropdown && (
                 <View style={styles.dropdown}>
                   {results.map((ing, idx) => (
                     <TouchableOpacity
                       key={ing.id}
-                      style={[styles.dropdownItem, idx < results.length - 1 && styles.dropdownDivider]}
+                      style={[
+                        styles.dropdownItem,
+                        (idx < results.length - 1 || noResults) && styles.dropdownDivider,
+                      ]}
                       onPress={() => handleSelect(ing)}
                       activeOpacity={0.7}
                     >
@@ -291,10 +376,35 @@ export function SmartAddBar({ onItemAdded }: Props) {
                       <Text style={styles.dropdownUnits}>{ing.units.join(', ')}</Text>
                     </TouchableOpacity>
                   ))}
+                  {noResults && query.trim().length > 0 && (
+                    <>
+                      {results.length === 0 && (
+                        <View style={styles.noResultsRow}>
+                          <Text style={styles.noResultsText}>No matches found</Text>
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        style={styles.addNewRow}
+                        onPress={handleAddAsNew}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.addNewIcon}>
+                          <Sparkles size={13} color="#D2691E" strokeWidth={2} />
+                        </View>
+                        <View style={styles.addNewTextWrap}>
+                          <Text style={styles.addNewLabel}>
+                            Add "{query.trim()}" as a new ingredient
+                          </Text>
+                          <Text style={styles.addNewHint}>AI will suggest category &amp; unit</Text>
+                        </View>
+                        <Text style={styles.addNewChevron}>›</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </View>
               )}
             </>
-          ) : (
+          ) : !showNewIngredient ? (
             <View style={styles.stepperRow}>
               <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
                 <X size={14} color="#8C6A5A" />
@@ -336,8 +446,18 @@ export function SmartAddBar({ onItemAdded }: Props) {
                 <Check size={16} color="#fff" strokeWidth={2.5} />
               </TouchableOpacity>
             </View>
-          )}
+          ) : null}
         </View>
+
+        {showNewIngredient && (
+          <NewIngredientExpansion
+            ingredientName={newIngredientName}
+            onSave={handleSaveNewIngredient}
+            onCancel={handleClear}
+            saving={saving}
+          />
+        )}
+        </>
       ) : (
         <BundleList onSelectBundle={handleSelectBundle} />
       )}
@@ -461,6 +581,56 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#E0D8CC',
     overflow: 'visible',
+  },
+  containerNewIngredient: {
+    borderColor: '#D2691E',
+    borderWidth: 1.5,
+  },
+  noResultsRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  noResultsText: {
+    fontSize: 12,
+    color: '#B8A898',
+    fontFamily: 'Inter_400Regular',
+  },
+  addNewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    gap: 10,
+  },
+  addNewIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FDF0E4',
+    borderWidth: 1,
+    borderColor: '#F0D5B5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addNewTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  addNewLabel: {
+    fontSize: 13,
+    color: '#2C1810',
+    fontFamily: 'Inter_400Regular',
+    fontWeight: '600',
+  },
+  addNewHint: {
+    fontSize: 11,
+    color: '#9C7B6A',
+    fontFamily: 'Inter_400Regular',
+  },
+  addNewChevron: {
+    fontSize: 18,
+    color: '#D2691E',
+    fontWeight: '600',
   },
   searchRow: {
     flexDirection: 'row',
