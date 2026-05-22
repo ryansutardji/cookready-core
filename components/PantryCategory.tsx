@@ -8,19 +8,16 @@ type Props = {
 };
 
 const CATEGORY_ICONS: Record<string, string> = {
-  Produce: '🥦',
+  Protein: '🥩',
+  Vegetable: '🥦',
+  Fruit: '🍎',
+  Grain: '🌾',
+  Oil: '🫒',
+  Fat: '🧈',
   Dairy: '🧀',
-  Meat: '🥩',
-  Seafood: '🐟',
-  Grains: '🌾',
+  Baking: '🍞',
+  'Spice/Sauce': '🌶️',
   Pantry: '🫙',
-  Spices: '🌶️',
-  Beverages: '🫖',
-  Frozen: '❄️',
-  Bakery: '🍞',
-  Condiments: '🫒',
-  Snacks: '🥨',
-  Other: '📦',
 };
 
 function formatInventory(raw: string): string {
