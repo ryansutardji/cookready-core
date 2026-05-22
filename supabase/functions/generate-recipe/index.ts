@@ -77,10 +77,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const apiKey = Deno.env.get('GOOGLE_AI_API_KEY');
+    const apiKey = Deno.env.get('AI_RECIPE_GENERATOR');
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: 'GOOGLE_AI_API_KEY is not configured.' }),
+        JSON.stringify({ error: 'AI_RECIPE_GENERATOR is not configured.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
