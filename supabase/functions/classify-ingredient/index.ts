@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai@^0.24.1';
+import { createClient } from 'npm:@supabase/supabase-js@^2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,50 +9,64 @@ const corsHeaders = {
 
 const CATEGORIES = ['Protein', 'Vegetable', 'Fruit', 'Grain', 'Oil', 'Fat', 'Dairy', 'Baking', 'Spice/Sauce', 'Pantry'];
 
-// Per-category units derived from DB (base_unit + preferred_unit of universal ingredients + their unit_conversion input_units)
-const CATEGORY_UNITS: Record<string, string[]> = {
-  Baking:        ['bag', 'bar', 'bottle', 'box', 'can', 'container', 'cup', 'g', 'jar', 'ml', 'packet', 'tbsp', 'tsp'],
-  Dairy:         ['bag', 'ball', 'block', 'bottle', 'can', 'carton', 'container', 'count', 'g', 'log', 'ml', 'pack', 'stick', 'tub', 'wedge', 'wheel'],
-  Fat:           ['block', 'g', 'jar', 'tub'],
-  Fruit:         ['apple', 'bag', 'banana', 'box', 'container', 'count', 'g', 'mango', 'peach', 'pear', 'unit'],
-  Grain:         ['bag', 'box', 'bundle', 'container', 'cup', 'g', 'pack'],
-  Oil:           ['bottle', 'jar', 'large_bottle', 'ml'],
-  Protein:       ['count', 'dozen', 'g', 'lb'],
-  'Spice/Sauce': ['bag', 'bottle', 'box', 'can', 'container', 'g', 'jar', 'leaf', 'ml', 'packet', 'tbsp', 'tsp', 'tub'],
-  Vegetable:     ['bag', 'bulb', 'bunch', 'carrot', 'clove', 'container', 'count', 'ear', 'g', 'head', 'knob', 'onion', 'pepper', 'pint', 'potato', 'shallot', 'stalk', 'tomato', 'unit'],
-  Pantry:        ['bag', 'bar', 'bottle', 'box', 'can', 'container', 'count', 'g', 'jar', 'ml', 'pack', 'packet', 'tub'],
-};
-
-// Units that exist in the DB as base_unit or preferred_unit on universal ingredients,
-// or as input_unit in unit_conversions — kept in sync with the DB.
 const UNIVERSAL_UNITS = new Set([
   'oz', 'lb', 'g', 'ml', 'cup', 'tbsp', 'tsp', 'pint', 'stick',
 ]);
 
-function buildSystemPrompt(validUnits: string[]): string {
-  const unitList = validUnits.map(u => `"${u}"`).join(', ');
+async function fetchUnitsByCategory(): Promise<Record<string, string[]>> {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+
+  const [ingResult, ucResult] = await Promise.all([
+    supabase
+      .from('ingredients')
+      .select('category, base_unit, preferred_unit')
+      .is('user_id', null),
+    supabase
+      .from('unit_conversions')
+      .select('input_unit, ingredients!inner(category, user_id)')
+      .is('ingredients.user_id', null),
+  ]);
+
+  const map: Record<string, Set<string>> = {};
+  for (const row of ingResult.data ?? []) {
+    if (!row.category) continue;
+    if (!map[row.category]) map[row.category] = new Set();
+    if (row.base_unit) map[row.category].add(row.base_unit);
+    if (row.preferred_unit) map[row.category].add(row.preferred_unit);
+  }
+  for (const row of (ucResult.data ?? []) as any[]) {
+    const cat = row.ingredients?.category;
+    if (!cat) continue;
+    if (!map[cat]) map[cat] = new Set();
+    if (row.input_unit) map[cat].add(row.input_unit);
+  }
+  return Object.fromEntries(
+    Object.entries(map).map(([cat, set]) => [cat, Array.from(set).sort()])
+  );
+}
+
+function buildSystemPrompt(category: string, categoryUnits: string[]): string {
+  const unitList = categoryUnits.map(u => `"${u}"`).join(', ');
   return `You are an ingredient classification assistant for a cooking pantry app.
 
-Given an ingredient name, respond with ONLY a JSON object (no markdown, no extra text) with these fields:
+Given an ingredient name in the category "${category}", respond with ONLY a JSON object (no markdown, no extra text) with these fields:
 
 {
-  "category": one of [${CATEGORIES.map(c => `"${c}"`).join(', ')}],
+  "category": "${category}",
   "preferred_unit": the most natural unit home cooks use for this ingredient. MUST be one of: [${unitList}],
   "base_unit": the canonical measurement unit that conversions are expressed in. MUST also be one of: [${unitList}],
-  "conversion_value": if preferred_unit is NOT a standard metric/imperial unit (i.e. not oz, lb, g, ml, cup, tbsp, tsp, pint, stick), provide an estimated numeric value representing how many grams or ml 1 preferred_unit equals. Otherwise set to null,
+  "conversion_value": if preferred_unit is NOT a standard metric/imperial unit (i.e. not g, ml, oz, lb, cup, tbsp, tsp, pint, stick), provide an estimated numeric value for how many grams or ml 1 preferred_unit equals. Otherwise set to null,
   "conversion_to_unit": the unit that conversion_value converts to (usually "g" for solids, "ml" for liquids). Set to null if conversion_value is null.
 }
 
 Rules:
 - preferred_unit and base_unit MUST be chosen from the provided unit list — never invent new units
 - Be practical — home pantry context, not restaurant
-- For whole produce, preferred_unit is usually "count" or the ingredient's own name unit if present in the list
-- For meats/fish, preferred_unit is usually "oz" or "lb"
-- For liquids (oils, sauces), preferred_unit is usually "tbsp" or "cup"
-- For spices, preferred_unit is usually "tsp"
-- For grains/flour, preferred_unit is usually "cup"
 - Estimate conversion_value based on typical specimen weight (e.g. 1 bunch basil ≈ 30g)
-- Only provide conversion_value when preferred_unit is non-standard (not in the standard metric/imperial list above)`;
+- Only provide conversion_value when preferred_unit is non-standard`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -69,10 +84,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { ingredient_name, valid_units } = body as {
-      ingredient_name: string;
-      valid_units?: string[];
-    };
+    const { ingredient_name } = body as { ingredient_name: string };
 
     if (!ingredient_name?.trim()) {
       return new Response(
@@ -81,13 +93,36 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const units = valid_units && valid_units.length > 0 ? valid_units : [];
+    // Fetch valid units per category live from the DB
+    const unitsByCategory = await fetchUnitsByCategory();
+    const allUnits = Array.from(new Set(Object.values(unitsByCategory).flat())).sort();
 
+    // First pass: determine category
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
+    const categoryPrompt = `You are an ingredient classifier. Given an ingredient name, respond with ONLY a JSON object with one field:
+{"category": one of [${CATEGORIES.map(c => `"${c}"`).join(', ')}]}
+Classify: "${ingredient_name.trim()}"`;
+
+    const catResult = await model.generateContent(categoryPrompt);
+    const catRaw = catResult.response.text().trim()
+      .replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    let detectedCategory = 'Pantry';
+    try {
+      const catParsed = JSON.parse(catRaw);
+      if (CATEGORIES.includes(catParsed.category)) {
+        detectedCategory = catParsed.category;
+      }
+    } catch { /* fall back to Pantry */ }
+
+    // Use the category's specific unit set; fall back to all units
+    const categoryUnits = unitsByCategory[detectedCategory] ?? allUnits;
+
+    // Second pass: classify with category-constrained unit list
     const result = await model.generateContent([
-      buildSystemPrompt(units),
+      buildSystemPrompt(detectedCategory, categoryUnits),
       `Classify this ingredient: "${ingredient_name.trim()}"`,
     ]);
 
@@ -111,18 +146,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!CATEGORIES.includes(parsed.category)) {
-      parsed.category = 'Pantry';
-    }
+    parsed.category = detectedCategory;
 
-    // Clamp preferred_unit to the valid set if provided
-    const validSet = new Set(units);
-    if (units.length > 0 && !validSet.has(parsed.preferred_unit)) {
-      parsed.preferred_unit = units[0];
-    }
-    if (units.length > 0 && !validSet.has(parsed.base_unit)) {
-      parsed.base_unit = parsed.preferred_unit;
-    }
+    // Clamp units to the valid set for safety
+    const validSet = new Set(categoryUnits);
+    if (!validSet.has(parsed.preferred_unit)) parsed.preferred_unit = categoryUnits[0] ?? 'g';
+    if (!validSet.has(parsed.base_unit)) parsed.base_unit = parsed.preferred_unit;
 
     const needs_custom_conversion = !UNIVERSAL_UNITS.has(parsed.preferred_unit);
 

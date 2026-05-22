@@ -116,9 +116,6 @@ export function NewIngredientExpansion({ ingredientName, onSave, onCancel, savin
       setUnitsByCategory(categoryUnits);
       const token = session?.access_token ?? SUPABASE_ANON_KEY;
 
-      // Flatten all units so the AI can suggest from any of them
-      const allUnits = Array.from(new Set(Object.values(categoryUnits).flat())).sort();
-
       const res = await fetch(`${SUPABASE_URL}/functions/v1/classify-ingredient`, {
         method: 'POST',
         headers: {
@@ -126,7 +123,7 @@ export function NewIngredientExpansion({ ingredientName, onSave, onCancel, savin
           'Authorization': `Bearer ${token}`,
           'Apikey': SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ ingredient_name: ingredientName, valid_units: allUnits }),
+        body: JSON.stringify({ ingredient_name: ingredientName }),
       });
 
       const result: ClassifyResult = await res.json();
