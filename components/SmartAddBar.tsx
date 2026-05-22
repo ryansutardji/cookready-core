@@ -170,6 +170,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
     setSaving(true);
     try {
       // Insert the new ingredient row with the current user's id
+      const { data: { user } } = await supabase.auth.getUser();
       const { data: newIng, error: ingError } = await supabase
         .from('ingredients')
         .insert({
@@ -177,6 +178,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
           category: ingredient.category,
           preferred_unit: ingredient.preferred_unit,
           base_unit: ingredient.base_unit,
+          user_id: user?.id,
         })
         .select('id')
         .single();
