@@ -55,19 +55,18 @@ export default function RecipeDetailScreen() {
       const r = data as SavedRecipe;
       setRecipe(r);
 
-      // Fetch pantry snapshot to check each ingredient
-      const { data: pantryRows } = await supabase
-        .from('ai_pantry_snapshot')
-        .select('name, raw_weight_or_count');
+      const { data: statusRows } = await supabase.rpc('get_recipe_ingredient_statuses', {
+        p_recipe_id: id,
+      });
 
-      const pantryMap: Record<string, number> = {};
-      for (const row of pantryRows ?? []) {
-        pantryMap[row.name.toLowerCase()] = row.raw_weight_or_count ?? 0;
+      const availabilityMap: Record<string, boolean> = {};
+      for (const row of statusRows ?? []) {
+        availabilityMap[(row.ingredient_name as string).toLowerCase()] = row.available as boolean;
       }
 
       const statuses: IngredientStatus[] = r.ingredients.map((ing) => ({
         ingredient: ing,
-        available: (pantryMap[ing.name.toLowerCase()] ?? 0) > 0,
+        available: availabilityMap[ing.name.toLowerCase()] ?? false,
       }));
 
       setIngredientStatuses(statuses);

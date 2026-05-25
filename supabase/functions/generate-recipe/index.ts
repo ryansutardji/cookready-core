@@ -27,7 +27,7 @@ const SYSTEM_PROMPT = `You are CookReady's AI Chef, a warm, knowledgeable culina
 - Pantry has 3.0 Chicken Breasts -> Recipe can use 0.5, 1.0, 1.5, 2.0, 2.5, or 3.0.
 
 ### UNIT LOGIC
-- **Spice/Sauce:** Use tsp, tbsp, or cups for any ingredient with the category "Spice/Sauce"
+- **Spice/Sauce:** ONLY use tsp, tbsp, or cups for any ingredient with the category "Spice/Sauce"
 - **Grain:** If whole grain (rice, quinoa, etc.), use "cups". If processed (pasta, noodles), use the pantry's preferred unit.
 - **Redundancy Check:** If the unit for an ingredient is the same as (or redundant with) the ingredient name itself (e.g. unit is "onion" and ingredient is "Onion", or unit is "chicken breast" and ingredient is "Chicken Breast"), omit the unit entirely and set "unit" to an empty string "" — the quantity alone is sufficient
 - **All others:** For all other ingredients, use the same units already present in the pantry data
