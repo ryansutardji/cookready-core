@@ -20,6 +20,7 @@ export type PantryItem = {
   unit: string;
   human_readable_inventory: string;
   conversionFactor?: number;
+  is_permanent: boolean;
 };
 
 export type PantryCategory = {

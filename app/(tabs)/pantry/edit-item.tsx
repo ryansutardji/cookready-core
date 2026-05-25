@@ -23,10 +23,12 @@ export default function EditItemScreen() {
     unit: string;
     category: string;
     conversionFactor: string;
+    is_permanent: string;
   }>();
 
   const [quantity, setQuantity] = useState(parseFloat(params.quantity ?? '0'));
   const [inputValue, setInputValue] = useState(String(parseFloat(params.quantity ?? '0')));
+  const [isPermanent, setIsPermanent] = useState(params.is_permanent === 'true');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
@@ -72,7 +74,11 @@ export default function EditItemScreen() {
       const baseQuantity = factor > 0 ? quantity * factor : quantity;
       const { error: err } = await supabase
         .from('user_pantry')
-        .update({ current_quantity_value: baseQuantity, last_updated: new Date().toISOString() })
+        .update({
+          current_quantity_value: baseQuantity,
+          is_permanent: isPermanent,
+          last_updated: new Date().toISOString(),
+        })
         .eq('id', params.id);
       if (err) throw err;
       router.back();
@@ -121,7 +127,12 @@ export default function EditItemScreen() {
           {unit ? <Text style={styles.unitLabel}>Unit: {unit}</Text> : null}
         </View>
 
-        <View style={styles.section}>
+        <View
+          style={[
+            styles.section,
+            isPermanent && { opacity: 0.38, pointerEvents: 'none' as const },
+          ]}
+        >
           <Text style={styles.sectionTitle}>Quantity</Text>
           <View style={styles.stepper}>
             <TouchableOpacity
@@ -172,6 +183,20 @@ export default function EditItemScreen() {
             ))}
           </View>
         </View>
+
+        <TouchableOpacity
+          onPress={() => setIsPermanent(!isPermanent)}
+          style={styles.alwaysInStockRow}
+          activeOpacity={0.7}
+        >
+          <View style={styles.alwaysInStockLeft}>
+            <Text style={styles.alwaysInStockLabel}>Always in stock</Text>
+            <Text style={styles.alwaysInStockHint}>Quantity won't be deducted when cooking</Text>
+          </View>
+          <View style={[styles.toggleSwitch, { backgroundColor: isPermanent ? '#D2691E' : '#E8E0D0' }]}>
+            <View style={[styles.toggleThumb, { transform: [{ translateX: isPermanent ? 20 : 2 }] }]} />
+          </View>
+        </TouchableOpacity>
 
         {error ? (
           <View style={styles.errorBox}>
@@ -267,6 +292,42 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#9C8678',
     marginTop: 2,
+  },
+  alwaysInStockRow: {
+    backgroundColor: '#F7F3ED',
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  alwaysInStockLeft: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  alwaysInStockLabel: {
+    fontFamily: 'NotoSerif_700Bold',
+    fontSize: 15,
+    color: '#4A3728',
+  },
+  alwaysInStockHint: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: '#9C8678',
+    marginTop: 4,
+  },
+  toggleSwitch: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#fff',
   },
   section: {
     backgroundColor: '#F7F3ED',
