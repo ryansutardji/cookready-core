@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  KeyboardAvoidingView,
+  Animated,
+  Keyboard,
   Modal,
   Platform,
   StyleSheet,
@@ -68,6 +69,33 @@ export default function ChefScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const TAB_BAR_HEIGHT = 52 + Math.max(insets.bottom, 8);
+  const kbOffset = useRef(new Animated.Value(0)).current;
+  const [kbVisible, setKbVisible] = useState(false);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const show = Keyboard.addListener(showEvent, (e) => {
+      setKbVisible(true);
+      Animated.timing(kbOffset, {
+        toValue: e.endCoordinates.height + (Platform.OS === 'android' ? insets.bottom : 0),
+        duration: Platform.OS === 'ios' ? e.duration : 250,
+        useNativeDriver: false,
+      }).start();
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    });
+
+    const hide = Keyboard.addListener(hideEvent, () => {
+      Animated.timing(kbOffset, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: false,
+      }).start(() => setKbVisible(false));
+    });
+
+    return () => { show.remove(); hide.remove(); };
+  }, [kbOffset, insets.bottom]);
 
   const chatHistory = useRef<{ role: 'user' | 'model'; parts: string }[]>([]);
   const offTopicCount = useRef(0);
@@ -171,11 +199,7 @@ export default function ChefScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={TAB_BAR_HEIGHT}
-    >
+    <Animated.View style={[styles.root, { paddingBottom: kbOffset }]}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.avatar}>
@@ -331,7 +355,7 @@ export default function ChefScreen() {
         </View>
       </Modal>
 
-      <View style={[styles.inputContainer, { paddingBottom: TAB_BAR_HEIGHT + 8 }]}>
+      <View style={[styles.inputContainer, { paddingBottom: kbVisible ? 8 : TAB_BAR_HEIGHT + 8 }]}>
         <View style={styles.inputRow}>
           <TextInput
             value={input}
@@ -355,7 +379,7 @@ export default function ChefScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </Animated.View>
   );
 }
 

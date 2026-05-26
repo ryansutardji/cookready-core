@@ -10,9 +10,9 @@ import {
   PanResponder,
   StyleSheet,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { X, Check, ChevronDown, Minus, Plus } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import type { Bundle } from '@/lib/bundles';
 
@@ -38,6 +38,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
   const [saving, setSaving] = useState(false);
   const [unitPickerIndex, setUnitPickerIndex] = useState<number | null>(null);
   const [unitPickerRow, setUnitPickerRow] = useState<IngredientRow | null>(null);
+  const insets = useSafeAreaInsets();
   // Single animated value drives all sheet movement — avoids Animated.add jank
   const sheetY = useRef(new Animated.Value(700)).current;
   // Track the settled position so drag offsets are computed correctly
@@ -413,7 +414,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
           </Modal>
 
           {/* Add Button */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
             <TouchableOpacity
               style={[
                 styles.addBtn,
@@ -455,7 +456,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '88%',
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    paddingBottom: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.12,
