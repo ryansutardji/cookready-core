@@ -2,7 +2,7 @@
 
 ## Subagents
 
-**ALWAYS check this list before starting any task. Deploy the matching specialist agent — do not attempt the work inline.**
+**ALWAYS check this list before starting any task. Deploy the matching specialist agent — do not attempt the work inline. ALWAYS include the agents you plan to deploy for each task/part of your plan, or mention none will be dployed**
 
 | Agent | Deploy when the task involves… |
 |---|---|
