@@ -39,6 +39,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
   const [saving, setSaving] = useState(false);
   const [unitPickerIndex, setUnitPickerIndex] = useState<number | null>(null);
   const [unitPickerRow, setUnitPickerRow] = useState<IngredientRow | null>(null);
+  const insets = useSafeAreaInsets();
   // Single animated value drives all sheet movement — avoids Animated.add jank
   const sheetY = useRef(new Animated.Value(700)).current;
   // Track the settled position so drag offsets are computed correctly
@@ -414,7 +415,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
           </Modal>
 
           {/* Add Button */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
             <TouchableOpacity
               style={[
                 styles.addBtn,
