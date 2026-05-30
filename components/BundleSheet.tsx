@@ -10,9 +10,9 @@ import {
   PanResponder,
   StyleSheet,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { X, Check, ChevronDown, Minus, Plus } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import type { Bundle } from '@/lib/bundles';
 
@@ -33,6 +33,7 @@ type Props = {
 };
 
 export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
+  const insets = useSafeAreaInsets();
   const [rows, setRows] = useState<IngredientRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -248,7 +249,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
         <Animated.View
           style={[
             styles.sheet,
-            { transform: [{ translateY: sheetY }] },
+            { transform: [{ translateY: sheetY }], paddingBottom: Math.max(20, insets.bottom + 12) },
           ]}
         >
           {/* Drag zone: handle + header + pills */}
@@ -262,7 +263,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
             {bundle && (
               <View style={styles.header}>
                 <View style={styles.headerLeft}>
-                  <View style={styles.headerIconWrap}>
+                  <View style={[styles.headerIconWrap, { backgroundColor: bundle.color + '26' }]}>
                     <Text style={styles.headerIcon}>{bundle.icon}</Text>
                   </View>
                   <View style={styles.headerText}>
@@ -455,7 +456,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '88%',
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.12,
@@ -491,7 +491,6 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 14,
-    backgroundColor: '#F5EFE6',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -10,10 +10,11 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import { Mic, Plus, Check, ChevronDown, X, Package, Sparkles } from 'lucide-react-native';
+import { Mic, Plus, Check, ChevronDown, X, Package, Sparkles, Search } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { BundleList } from '@/components/BundleList';
 import { BundleSheet } from '@/components/BundleSheet';
+import { BundlePicker } from '@/components/BundlePicker';
 import { NewIngredientExpansion } from '@/components/NewIngredientExpansion';
 import type { Bundle } from '@/lib/bundles';
 
@@ -54,9 +55,9 @@ export function SmartAddBar({ onItemAdded }: Props) {
   const [toastVisible, setToastVisible] = useState(false);
   const [selectedBundle, setSelectedBundle] = useState<Bundle | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
-  // Net-new ingredient state
   const [showNewIngredient, setShowNewIngredient] = useState(false);
   const [newIngredientName, setNewIngredientName] = useState('');
+  const [showAll, setShowAll] = useState(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,8 +72,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
     const { data: { user } } = await supabase.auth.getUser();
     const userId = user?.id ?? null;
 
-    // Fetch ingredients visible to this user: universal (user_id IS NULL) or their own
-    let query = supabase
+    let q = supabase
       .from('ingredients')
       .select('id, name, category, base_unit, preferred_unit, user_id')
       .ilike('name', `%${text}%`)
@@ -80,12 +80,12 @@ export function SmartAddBar({ onItemAdded }: Props) {
       .limit(8);
 
     if (userId) {
-      query = query.or(`user_id.is.null,user_id.eq.${userId}`);
+      q = q.or(`user_id.is.null,user_id.eq.${userId}`);
     } else {
-      query = query.is('user_id', null);
+      q = q.is('user_id', null);
     }
 
-    const { data } = await query;
+    const { data } = await q;
 
     if (data && data.length > 0) {
       const ids = data.map((d: any) => d.id);
@@ -129,9 +129,10 @@ export function SmartAddBar({ onItemAdded }: Props) {
 
   useEffect(() => {
     if (selected) return;
+    if (mode !== 'single') return;
     const timer = setTimeout(() => searchIngredients(query), 200);
     return () => clearTimeout(timer);
-  }, [query, selected, searchIngredients]);
+  }, [query, selected, mode, searchIngredients]);
 
   function handleSelect(ing: Ingredient) {
     setSelected(ing);
@@ -169,7 +170,6 @@ export function SmartAddBar({ onItemAdded }: Props) {
   }) {
     setSaving(true);
     try {
-      // Insert the new ingredient row with the current user's id
       const { data: { user } } = await supabase.auth.getUser();
       const { data: newIng, error: ingError } = await supabase
         .from('ingredients')
@@ -185,7 +185,6 @@ export function SmartAddBar({ onItemAdded }: Props) {
 
       if (ingError) throw ingError;
 
-      // Insert a unit conversion row only for non-standard (custom) units
       if (ingredient.conversion_value != null && ingredient.conversion_to_unit) {
         const toUnit = ingredient.conversion_to_unit === 'count' ? 'each' : ingredient.conversion_to_unit;
         await supabase.from('unit_conversions').insert({
@@ -196,7 +195,6 @@ export function SmartAddBar({ onItemAdded }: Props) {
         });
       }
 
-      // Add to the user's pantry
       await supabase.rpc('add_pantry_item', {
         p_ingredient_name: ingredient.name,
         p_quantity: 1,
@@ -212,7 +210,6 @@ export function SmartAddBar({ onItemAdded }: Props) {
         unit: ingredient.preferred_unit,
       });
     } catch (err: any) {
-      // Surface error without crashing
       console.error('Failed to save new ingredient:', err?.message);
     } finally {
       setSaving(false);
@@ -284,6 +281,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
   function handleBundleAdded() {
     onItemAdded();
     setMode('single');
+    setQuery('');
     showToast({
       message: 'Bundle items added to your pantry.',
       ingredientName: '',
@@ -294,6 +292,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
 
   function switchMode(next: Mode) {
     setMode(next);
+    setQuery('');
     handleClear();
   }
 
@@ -316,152 +315,174 @@ export function SmartAddBar({ onItemAdded }: Props) {
         </Animated.View>
       )}
 
-      {/* Mode Toggle */}
-      <View style={styles.toggleWrap}>
-        <TouchableOpacity
-          style={[styles.toggleBtn, mode === 'single' && styles.toggleBtnActive]}
-          onPress={() => switchMode('single')}
-          activeOpacity={0.8}
-        >
-          <Plus size={14} color={mode === 'single' ? '#D2691E' : '#9C7B6A'} strokeWidth={2.5} />
-          <Text style={[styles.toggleText, mode === 'single' && styles.toggleTextActive]}>
-            Single ingredient
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.toggleBtn, mode === 'bundle' && styles.toggleBtnActive]}
-          onPress={() => switchMode('bundle')}
-          activeOpacity={0.8}
-        >
-          <Package size={14} color={mode === 'bundle' ? '#D2691E' : '#9C7B6A'} strokeWidth={2} />
-          <Text style={[styles.toggleText, mode === 'bundle' && styles.toggleTextActive]}>
-            Bundle
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {mode === 'single' ? (
-        <>
-        <View style={[styles.container, showNewIngredient && styles.containerNewIngredient]}>
-          {!selected && !showNewIngredient ? (
-            <>
-              <View style={styles.searchRow}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Add an ingredient to your pantry..."
-                  placeholderTextColor="#B8A898"
-                  value={query}
-                  onChangeText={setQuery}
-                  returnKeyType="search"
-                />
-                <TouchableOpacity style={styles.micBtn}>
-                  <Mic size={18} color="#D2691E" />
-                </TouchableOpacity>
-              </View>
-
-              {showDropdown && (
-                <View style={styles.dropdown}>
-                  {results.map((ing, idx) => (
-                    <TouchableOpacity
-                      key={ing.id}
-                      style={[
-                        styles.dropdownItem,
-                        (idx < results.length - 1 || noResults) && styles.dropdownDivider,
-                      ]}
-                      onPress={() => handleSelect(ing)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.dropdownMain}>
-                        <Text style={styles.dropdownName}>{ing.name}</Text>
-                        <Text style={styles.dropdownCategory}>{ing.category}</Text>
-                      </View>
-                      <Text style={styles.dropdownUnits}>{ing.units.join(', ')}</Text>
-                    </TouchableOpacity>
-                  ))}
-                  {noResults && query.trim().length > 0 && (
-                    <>
-                      {results.length === 0 && (
-                        <View style={styles.noResultsRow}>
-                          <Text style={styles.noResultsText}>No matches found</Text>
-                        </View>
-                      )}
-                      <TouchableOpacity
-                        style={styles.addNewRow}
-                        onPress={handleAddAsNew}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.addNewIcon}>
-                          <Sparkles size={13} color="#D2691E" strokeWidth={2} />
-                        </View>
-                        <View style={styles.addNewTextWrap}>
-                          <Text style={styles.addNewLabel}>
-                            Add "{query.trim()}" as a new ingredient
-                          </Text>
-                          <Text style={styles.addNewHint}>AI will suggest category &amp; unit</Text>
-                        </View>
-                        <Text style={styles.addNewChevron}>›</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </View>
-              )}
-            </>
-          ) : !showNewIngredient ? (
-            <View style={styles.stepperRow}>
-              <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
-                <X size={14} color="#8C6A5A" />
-              </TouchableOpacity>
-
-              <Text style={styles.ingredientName}>{selected.name}</Text>
-
-              <View style={styles.stepperControls}>
-                <TouchableOpacity
-                  style={styles.stepBtn}
-                  onPress={() => setQuantity((q) => Math.max(1, q - 1))}
-                >
-                  <Text style={styles.stepBtnText}>−</Text>
-                </TouchableOpacity>
-
-                <Text style={styles.quantityText}>{quantity}</Text>
-
-                <TouchableOpacity
-                  style={styles.stepBtn}
-                  onPress={() => setQuantity((q) => q + 1)}
-                >
-                  <Text style={styles.stepBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={styles.unitSelector}
-                onPress={() => setShowUnitPicker(true)}
-              >
-                <Text style={styles.unitText}>{selectedUnit}</Text>
-                <ChevronDown size={13} color="#4A3728" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.saveBtn, saving && { opacity: 0.5 }]}
-                onPress={handleSave}
-                disabled={saving}
-              >
-                <Check size={16} color="#fff" strokeWidth={2.5} />
-              </TouchableOpacity>
-            </View>
-          ) : null}
+      <View style={[styles.container, showNewIngredient && styles.containerNewIngredient]}>
+        {/* Segmented toggle lives inside the container */}
+        <View style={styles.toggleWrap}>
+          <TouchableOpacity
+            style={[styles.toggleBtn, mode === 'single' && styles.toggleBtnActive]}
+            onPress={() => switchMode('single')}
+            activeOpacity={0.8}
+          >
+            <Plus size={14} color={mode === 'single' ? '#D2691E' : '#9C7B6A'} strokeWidth={2.5} />
+            <Text style={[styles.toggleText, mode === 'single' && styles.toggleTextActive]}>
+              Single ingredient
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, mode === 'bundle' && styles.toggleBtnActive]}
+            onPress={() => switchMode('bundle')}
+            activeOpacity={0.8}
+          >
+            <Package size={14} color={mode === 'bundle' ? '#D2691E' : '#9C7B6A'} strokeWidth={2} />
+            <Text style={[styles.toggleText, mode === 'bundle' && styles.toggleTextActive]}>
+              Bundle
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {showNewIngredient && (
-          <NewIngredientExpansion
-            ingredientName={newIngredientName}
-            onSave={handleSaveNewIngredient}
-            onCancel={handleClear}
-            saving={saving}
-          />
-        )}
-        </>
-      ) : (
-        <BundleList onSelectBundle={handleSelectBundle} />
+        {mode === 'bundle' ? (
+          <View style={styles.searchRow}>
+            <Search size={16} color="#9C7B6A" />
+            <TextInput
+              style={styles.input}
+              placeholder="Search bundles..."
+              placeholderTextColor="#B8A898"
+              value={query}
+              onChangeText={setQuery}
+            />
+            {query.length > 0 ? (
+              <TouchableOpacity style={styles.clearBtnBundle} onPress={() => setQuery('')} activeOpacity={0.7}>
+                <X size={13} color="#9C7B6A" />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.micBtn}>
+                <Mic size={16} color="#D2691E" />
+              </View>
+            )}
+          </View>
+        ) : !selected && !showNewIngredient ? (
+          <>
+            <View style={styles.searchRow}>
+              <TextInput
+                style={styles.input}
+                placeholder="Add an ingredient to your pantry..."
+                placeholderTextColor="#B8A898"
+                value={query}
+                onChangeText={setQuery}
+                returnKeyType="search"
+              />
+              <TouchableOpacity style={styles.micBtn}>
+                <Mic size={18} color="#D2691E" />
+              </TouchableOpacity>
+            </View>
+
+            {showDropdown && (
+              <View style={styles.dropdown}>
+                {results.map((ing, idx) => (
+                  <TouchableOpacity
+                    key={ing.id}
+                    style={[
+                      styles.dropdownItem,
+                      (idx < results.length - 1 || noResults) && styles.dropdownDivider,
+                    ]}
+                    onPress={() => handleSelect(ing)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.dropdownMain}>
+                      <Text style={styles.dropdownName}>{ing.name}</Text>
+                      <Text style={styles.dropdownCategory}>{ing.category}</Text>
+                    </View>
+                    <Text style={styles.dropdownUnits}>{ing.units.join(', ')}</Text>
+                  </TouchableOpacity>
+                ))}
+                {noResults && query.trim().length > 0 && (
+                  <>
+                    {results.length === 0 && (
+                      <View style={styles.noResultsRow}>
+                        <Text style={styles.noResultsText}>No matches found</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.addNewRow}
+                      onPress={handleAddAsNew}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.addNewIcon}>
+                        <Sparkles size={13} color="#D2691E" strokeWidth={2} />
+                      </View>
+                      <View style={styles.addNewTextWrap}>
+                        <Text style={styles.addNewLabel}>
+                          Add "{query.trim()}" as a new ingredient
+                        </Text>
+                        <Text style={styles.addNewHint}>AI will suggest category &amp; unit</Text>
+                      </View>
+                      <Text style={styles.addNewChevron}>›</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            )}
+          </>
+        ) : !showNewIngredient ? (
+          <View style={styles.stepperRow}>
+            <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
+              <X size={14} color="#8C6A5A" />
+            </TouchableOpacity>
+
+            <Text style={styles.ingredientName}>{selected!.name}</Text>
+
+            <View style={styles.stepperControls}>
+              <TouchableOpacity
+                style={styles.stepBtn}
+                onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+              >
+                <Text style={styles.stepBtnText}>−</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.quantityText}>{quantity}</Text>
+
+              <TouchableOpacity
+                style={styles.stepBtn}
+                onPress={() => setQuantity((q) => q + 1)}
+              >
+                <Text style={styles.stepBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.unitSelector}
+              onPress={() => setShowUnitPicker(true)}
+            >
+              <Text style={styles.unitText}>{selectedUnit}</Text>
+              <ChevronDown size={13} color="#4A3728" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.saveBtn, saving && { opacity: 0.5 }]}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              <Check size={16} color="#fff" strokeWidth={2.5} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+      </View>
+
+      {showNewIngredient && (
+        <NewIngredientExpansion
+          ingredientName={newIngredientName}
+          onSave={handleSaveNewIngredient}
+          onCancel={handleClear}
+          saving={saving}
+        />
+      )}
+
+      {mode === 'bundle' && (
+        <BundleList
+          query={query}
+          onSelectBundle={handleSelectBundle}
+          onBrowseAll={() => setShowAll(true)}
+        />
       )}
 
       <Modal
@@ -502,6 +523,12 @@ export function SmartAddBar({ onItemAdded }: Props) {
         visible={sheetVisible}
         onClose={handleSheetClose}
         onAdded={handleBundleAdded}
+      />
+
+      <BundlePicker
+        visible={showAll}
+        onPick={(b) => { setShowAll(false); handleSelectBundle(b); }}
+        onClose={() => setShowAll(false)}
       />
     </View>
   );
@@ -544,11 +571,23 @@ const styles = StyleSheet.create({
   toastClose: {
     padding: 2,
   },
+  container: {
+    backgroundColor: '#F5EFE6',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E0D8CC',
+    overflow: 'visible',
+  },
+  containerNewIngredient: {
+    borderColor: '#D2691E',
+    borderWidth: 1.5,
+  },
   toggleWrap: {
     flexDirection: 'row',
     backgroundColor: '#EDE7DC',
     borderRadius: 14,
     padding: 3,
+    margin: 4,
     gap: 2,
   },
   toggleBtn: {
@@ -576,17 +615,6 @@ const styles = StyleSheet.create({
   },
   toggleTextActive: {
     color: '#2C1810',
-  },
-  container: {
-    backgroundColor: '#F5EFE6',
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#E0D8CC',
-    overflow: 'visible',
-  },
-  containerNewIngredient: {
-    borderColor: '#D2691E',
-    borderWidth: 1.5,
   },
   noResultsRow: {
     paddingHorizontal: 16,
@@ -656,6 +684,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  clearBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#EDE7DC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearBtnBundle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#EDE7DC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dropdown: {
     borderTopWidth: 1,
     borderTopColor: '#E0D8CC',
@@ -699,14 +743,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 8,
-  },
-  clearBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#EDE7DC',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   ingredientName: {
     flex: 1,
