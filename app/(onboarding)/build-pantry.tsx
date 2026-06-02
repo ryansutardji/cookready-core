@@ -23,8 +23,8 @@ import {
   ArrowRight,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { BUNDLES } from '@/lib/bundles';
 import type { Bundle } from '@/lib/bundles';
+import { useBundles } from '@/hooks/useBundles';
 
 // ---------------------------------------------------------------------------
 // Meter definition
@@ -257,9 +257,9 @@ function BundleTile({
   async function loadRows() {
     setLoading(true);
     try {
-      const names = bundle.ingredients.map((i) => i.name);
+      const ingredientIds = bundle.ingredients.map((i) => i.ingredientId);
       const [ingredientResult, pantryResult] = await Promise.all([
-        supabase.from('ingredients').select('id, name, base_unit, preferred_unit').in('name', names),
+        supabase.from('ingredients').select('id, name, base_unit, preferred_unit').in('id', ingredientIds),
         supabase.from('user_pantry').select('ingredient_id, current_quantity_value').gt('current_quantity_value', 0),
       ]);
 
@@ -278,11 +278,12 @@ function BundleTile({
         if (uc.input_unit) ucMap[uc.ingredient_id].push(uc.input_unit);
       }
 
+      // Keyed by ingredient uuid for O(1) lookup
       const ingMap: Record<string, any> = {};
-      for (const ing of ingredients) ingMap[ing.name] = ing;
+      for (const ing of ingredients) ingMap[ing.id] = ing;
 
       const built: IngredientRow[] = bundle.ingredients.map((bundleIng) => {
-        const ing = ingMap[bundleIng.name];
+        const ing = ingMap[bundleIng.ingredientId];
         const alreadyHave = ing ? pantryIds.has(ing.id) : false;
         let availableUnits: string[] = [bundleIng.defaultUnit];
         if (ing) {
@@ -853,6 +854,7 @@ const singleStyles = StyleSheet.create({
 // ---------------------------------------------------------------------------
 export default function BuildPantryScreen() {
   const router = useRouter();
+  const { bundles, loading: bundlesLoading } = useBundles();
   const [meterCounts, setMeterCounts] = useState<Record<string, number>>({
     protein: 0, vegetable: 0, grain: 0, spice: 0, oil: 0, fruit: 0, baking: 0,
   });
@@ -941,15 +943,21 @@ export default function BuildPantryScreen() {
         <Text style={[screenStyles.sectionLabel, { fontFamily: 'Inter_400Regular' }]}>
           Starter bundles
         </Text>
-        {BUNDLES.map((bundle) => (
-          <BundleTile
-            key={bundle.id}
-            bundle={bundle}
-            expanded={expandedBundle === bundle.id}
-            onToggle={() => handleToggleBundle(bundle.id)}
-            onAdded={handleAdded}
-          />
-        ))}
+        {bundlesLoading ? (
+          <View style={screenStyles.bundlesLoading}>
+            <ActivityIndicator size="small" color="#D2691E" />
+          </View>
+        ) : (
+          bundles.map((bundle) => (
+            <BundleTile
+              key={bundle.id}
+              bundle={bundle}
+              expanded={expandedBundle === bundle.id}
+              onToggle={() => handleToggleBundle(bundle.id)}
+              onAdded={handleAdded}
+            />
+          ))
+        )}
 
         <Text style={[screenStyles.sectionLabel, { fontFamily: 'Inter_400Regular', marginTop: 8 }]}>
           Add individual ingredients
@@ -1038,6 +1046,11 @@ const screenStyles = StyleSheet.create({
     justifyContent: 'center',
     marginHorizontal: 16,
     marginBottom: 8,
+  },
+  bundlesLoading: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scroll: { flex: 1 },
   scrollContent: {

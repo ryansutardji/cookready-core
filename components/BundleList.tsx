@@ -1,24 +1,34 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { ChevronRight, LayoutGrid } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BUNDLES, type Bundle } from '@/lib/bundles';
+import type { Bundle } from '@/lib/bundles';
 
 type Props = {
   query: string;
+  bundles: Bundle[];
+  loading: boolean;
   onSelectBundle: (bundle: Bundle) => void;
   onBrowseAll: () => void;
 };
 
-export function BundleList({ query, onSelectBundle, onBrowseAll }: Props) {
+export function BundleList({ query, bundles, loading, onSelectBundle, onBrowseAll }: Props) {
   const [atBottom, setAtBottom] = useState(false);
   const [atTop, setAtTop] = useState(true);
   // Measured from the first rendered row — avoids hardcoding a dp constant that
   // may not match the actual font/layout metrics on the device.
   const [rowH, setRowH] = useState(0);
 
+  if (loading) {
+    return (
+      <View style={[styles.card, styles.loadingWrap]}>
+        <ActivityIndicator size="small" color="#D2691E" />
+      </View>
+    );
+  }
+
   const q = query.trim().toLowerCase();
-  const filtered = BUNDLES.filter(
+  const filtered = bundles.filter(
     (b) =>
       !q ||
       b.name.toLowerCase().includes(q) ||
@@ -196,5 +206,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
     color: '#D2691E',
+  },
+  loadingWrap: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

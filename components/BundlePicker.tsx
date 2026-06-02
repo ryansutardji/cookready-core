@@ -9,18 +9,21 @@ import {
   Easing,
   PanResponder,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BUNDLES, type Bundle } from '@/lib/bundles';
+import type { Bundle } from '@/lib/bundles';
 
 type Props = {
   visible: boolean;
+  bundles: Bundle[];
+  loading: boolean;
   onPick: (bundle: Bundle) => void;
   onClose: () => void;
 };
 
-export function BundlePicker({ visible, onPick, onClose }: Props) {
+export function BundlePicker({ visible, bundles, loading, onPick, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const sheetY = useRef(new Animated.Value(700)).current;
   const settledY = useRef(700);
@@ -130,9 +133,14 @@ export function BundlePicker({ visible, onPick, onClose }: Props) {
             </View>
           </View>
 
+          {loading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator size="small" color="#D2691E" />
+            </View>
+          ) : (
           <FlatList
             key="bundlepicker"
-            data={BUNDLES}
+            data={bundles}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
             numColumns={2}
@@ -140,6 +148,7 @@ export function BundlePicker({ visible, onPick, onClose }: Props) {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           />
+          )}
         </Animated.View>
       </View>
     </Modal>
@@ -247,6 +256,11 @@ const styles = StyleSheet.create({
   },
   tagPillWrap: {
     alignSelf: 'flex-start',
+  },
+  loadingWrap: {
+    paddingVertical: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tagPill: {
     fontFamily: 'Inter_400Regular',
