@@ -17,6 +17,7 @@ import { BundleSheet } from '@/components/BundleSheet';
 import { BundlePicker } from '@/components/BundlePicker';
 import { NewIngredientExpansion } from '@/components/NewIngredientExpansion';
 import type { Bundle } from '@/lib/bundles';
+import { useBundles } from '@/hooks/useBundles';
 
 type Ingredient = {
   id: string;
@@ -41,6 +42,7 @@ type ToastInfo = {
 type Mode = 'single' | 'bundle';
 
 export function SmartAddBar({ onItemAdded }: Props) {
+  const { bundles, loading: bundlesLoading } = useBundles();
   const [mode, setMode] = useState<Mode>('single');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Ingredient[]>([]);
@@ -480,6 +482,8 @@ export function SmartAddBar({ onItemAdded }: Props) {
       {mode === 'bundle' && (
         <BundleList
           query={query}
+          bundles={bundles}
+          loading={bundlesLoading}
           onSelectBundle={handleSelectBundle}
           onBrowseAll={() => setShowAll(true)}
         />
@@ -527,6 +531,8 @@ export function SmartAddBar({ onItemAdded }: Props) {
 
       <BundlePicker
         visible={showAll}
+        bundles={bundles}
+        loading={bundlesLoading}
         onPick={(b) => { setShowAll(false); handleSelectBundle(b); }}
         onClose={() => setShowAll(false)}
       />

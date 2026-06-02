@@ -98,13 +98,13 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
   async function loadIngredients(b: Bundle) {
     setLoading(true);
     try {
-      const names = b.ingredients.map((i) => i.name);
+      const ids = b.ingredients.map((i) => i.ingredientId);
 
       const [ingredientResult, pantryResult] = await Promise.all([
         supabase
           .from('ingredients')
           .select('id, name, base_unit, preferred_unit')
-          .in('name', names),
+          .in('id', ids),
         supabase
           .from('user_pantry')
           .select('ingredient_id, current_quantity_value')
@@ -115,11 +115,11 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
       const pantryItems = pantryResult.data ?? [];
       const pantryIds = new Set(pantryItems.map((p: any) => p.ingredient_id));
 
-      const ids = ingredients.map((i: any) => i.id);
+      const ingredientIds = ingredients.map((i: any) => i.id);
       const { data: ucData } = await supabase
         .from('unit_conversions')
         .select('ingredient_id, input_unit')
-        .in('ingredient_id', ids);
+        .in('ingredient_id', ingredientIds);
 
       const { data: globalUc } = await supabase
         .from('unit_conversions')
@@ -132,13 +132,14 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
         if (uc.input_unit) ucMap[uc.ingredient_id].push(uc.input_unit);
       }
 
+      // Keyed by ingredient uuid for O(1) lookup
       const ingredientMap: Record<string, any> = {};
       for (const ing of ingredients) {
-        ingredientMap[ing.name] = ing;
+        ingredientMap[ing.id] = ing;
       }
 
       const built: IngredientRow[] = b.ingredients.map((bundleIng) => {
-        const ing = ingredientMap[bundleIng.name];
+        const ing = ingredientMap[bundleIng.ingredientId];
         const alreadyHave = ing ? pantryIds.has(ing.id) : false;
 
         let availableUnits: string[] = [bundleIng.defaultUnit];
