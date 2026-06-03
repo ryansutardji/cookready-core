@@ -173,7 +173,8 @@ export default function ChefScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
+      enabled={Platform.OS === 'ios'}
       keyboardVerticalOffset={TAB_BAR_HEIGHT}
     >
       <View style={styles.header}>
