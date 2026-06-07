@@ -10,7 +10,7 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import { Mic, Plus, Check, ChevronDown, X, Package, Sparkles, Search } from 'lucide-react-native';
+import { Mic, Plus, Check, ChevronDown, X, Package, Sparkles, Search, Pin } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { BundleList } from '@/components/BundleList';
 import { BundleSheet } from '@/components/BundleSheet';
@@ -60,6 +60,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
   const [showNewIngredient, setShowNewIngredient] = useState(false);
   const [newIngredientName, setNewIngredientName] = useState('');
   const [showAll, setShowAll] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -154,6 +155,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
     setSelectedUnit('');
     setShowNewIngredient(false);
     setNewIngredientName('');
+    setPinned(false);
   }
 
   function handleAddAsNew() {
@@ -226,6 +228,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
         p_ingredient_name: selected.name,
         p_quantity: quantity,
         p_unit: selectedUnit,
+        p_is_permanent: pinned,
       });
 
       const toastData: ToastInfo = {
@@ -426,46 +429,62 @@ export function SmartAddBar({ onItemAdded }: Props) {
             )}
           </>
         ) : !showNewIngredient ? (
-          <View style={styles.stepperRow}>
-            <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
-              <X size={14} color="#8C6A5A" />
-            </TouchableOpacity>
-
-            <Text style={styles.ingredientName}>{selected!.name}</Text>
-
-            <View style={styles.stepperControls}>
-              <TouchableOpacity
-                style={styles.stepBtn}
-                onPress={() => setQuantity((q) => Math.max(1, q - 1))}
-              >
-                <Text style={styles.stepBtnText}>−</Text>
+          <View>
+            {/* existing confirm row */}
+            <View style={styles.stepperRow}>
+              <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
+                <X size={14} color="#8C6A5A" />
               </TouchableOpacity>
 
-              <Text style={styles.quantityText}>{quantity}</Text>
+              <Text style={styles.ingredientName}>{selected!.name}</Text>
+
+              {/* Grey out qty + unit when pinned */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, opacity: pinned ? 0.3 : 1 }}
+                    pointerEvents={pinned ? 'none' : 'auto'}>
+                <View style={styles.stepperControls}>
+                  <TouchableOpacity style={styles.stepBtn} onPress={() => setQuantity((q) => Math.max(1, q - 1))}>
+                    <Text style={styles.stepBtnText}>−</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.quantityText}>{quantity}</Text>
+                  <TouchableOpacity style={styles.stepBtn} onPress={() => setQuantity((q) => q + 1)}>
+                    <Text style={styles.stepBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity style={styles.unitSelector} onPress={() => setShowUnitPicker(true)}>
+                  <Text style={styles.unitText}>{selectedUnit}</Text>
+                  <ChevronDown size={13} color="#4A3728" />
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
-                style={styles.stepBtn}
-                onPress={() => setQuantity((q) => q + 1)}
+                style={[styles.saveBtn, saving && { opacity: 0.5 }]}
+                onPress={handleSave}
+                disabled={saving}
               >
-                <Text style={styles.stepBtnText}>+</Text>
+                <Check size={16} color="#fff" strokeWidth={2.5} />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={styles.unitSelector}
-              onPress={() => setShowUnitPicker(true)}
-            >
-              <Text style={styles.unitText}>{selectedUnit}</Text>
-              <ChevronDown size={13} color="#4A3728" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.saveBtn, saving && { opacity: 0.5 }]}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              <Check size={16} color="#fff" strokeWidth={2.5} />
-            </TouchableOpacity>
+            {/* NEW pin row */}
+            <View style={styles.pinRow}>
+              <Pin
+                size={13}
+                color={pinned ? '#D2691E' : '#9C7B6A'}
+                fill={pinned ? '#D2691E' : 'none'}
+                strokeWidth={1.75}
+              />
+              <Text style={[styles.pinLabel, pinned && styles.pinLabelActive]}>
+                {pinned ? 'Pinned · always in stock' : 'Pin as a staple item'}
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setPinned((p) => !p)}
+                style={[styles.toggleTrack, pinned && styles.toggleTrackOn]}
+              >
+                <View style={[styles.toggleThumb, pinned && styles.toggleThumbOn]} />
+              </TouchableOpacity>
+            </View>
           </View>
         ) : null}
       </View>
@@ -806,6 +825,51 @@ const styles = StyleSheet.create({
     backgroundColor: '#D2691E',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  pinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#EDE8DE',
+  },
+  pinLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9C7B6A',
+    fontFamily: 'Inter_400Regular',
+  },
+  pinLabelActive: {
+    color: '#D2691E',
+  },
+  toggleTrack: {
+    width: 38,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#C5BDB5',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  toggleTrackOn: {
+    backgroundColor: '#D2691E',
+  },
+  toggleThumb: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.28,
+    shadowRadius: 2,
+    elevation: 2,
+    alignSelf: 'flex-start',
+  },
+  toggleThumbOn: {
+    alignSelf: 'flex-end',
   },
   pickerOverlay: {
     flex: 1,

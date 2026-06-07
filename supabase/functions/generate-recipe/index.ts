@@ -133,8 +133,28 @@ Deno.serve(async (req: Request) => {
       ],
     });
 
-    const result = await chat.sendMessage(message);
-    const rawText = result.response.text();
+    const MAX_ATTEMPTS = 3;
+    let lastErr: unknown;
+    let rawText = '';
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      try {
+        const result = await chat.sendMessage(message);
+        rawText = result.response.text();
+        lastErr = undefined;
+        break;
+      } catch (err) {
+        lastErr = err;
+        const msg = err instanceof Error ? err.message : '';
+        const is503 = msg.includes('503') || msg.toLowerCase().includes('service unavailable');
+        if (is503 && attempt < MAX_ATTEMPTS - 1) {
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1))); // 1s, then 2s
+          continue;
+        }
+        throw err;
+      }
+    }
+    if (lastErr) throw lastErr;
 
     const SAFETY_DECLINE_MESSAGES: Record<string, string> = {
       baby: "Due to the complexities of dietary requirements and safety considerations for babies, I'm not able to recommend a recipe that claims to be baby-friendly. Please consult with your pediatrician for appropriate guidance.",
@@ -171,6 +191,7 @@ Deno.serve(async (req: Request) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err: unknown) {
+    console.error('[generate-recipe] error:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';
     return new Response(
       JSON.stringify({ error: message }),
