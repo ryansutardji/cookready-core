@@ -1,0 +1,1 @@
+- [Migration History Sync](project_migration_sync.md) — Local/remote histories diverge; run `migration list` + `repair` before `db push`, use `ON CONFLICT DO NOTHING` for ingredient inserts
