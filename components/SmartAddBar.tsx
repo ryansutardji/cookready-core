@@ -345,27 +345,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
           </TouchableOpacity>
         </View>
 
-        {mode === 'bundle' ? (
-          <View style={styles.searchRow}>
-            <Search size={16} color="#9C7B6A" />
-            <TextInput
-              style={styles.input}
-              placeholder="Search bundles..."
-              placeholderTextColor="#B8A898"
-              value={query}
-              onChangeText={setQuery}
-            />
-            {query.length > 0 ? (
-              <TouchableOpacity style={styles.clearBtnBundle} onPress={() => setQuery('')} activeOpacity={0.7}>
-                <X size={13} color="#9C7B6A" />
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.micBtn}>
-                <Mic size={16} color="#D2691E" />
-              </View>
-            )}
-          </View>
-        ) : !selected && !showNewIngredient ? (
+        {mode === 'bundle' ? null : !selected && !showNewIngredient ? (
           <>
             <View style={styles.searchRow}>
               <TextInput
@@ -500,8 +480,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
 
       {mode === 'bundle' && (
         <BundleList
-          query={query}
-          bundles={bundles}
+          bundles={bundles.slice(0, 4)}
           loading={bundlesLoading}
           onSelectBundle={handleSelectBundle}
           onBrowseAll={() => setShowAll(true)}
@@ -713,14 +692,6 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#EDE7DC',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clearBtnBundle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
     backgroundColor: '#EDE7DC',
     alignItems: 'center',
     justifyContent: 'center',

@@ -1,24 +1,15 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { ChevronRight, LayoutGrid } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import type { Bundle } from '@/lib/bundles';
 
 type Props = {
-  query: string;
   bundles: Bundle[];
   loading: boolean;
   onSelectBundle: (bundle: Bundle) => void;
   onBrowseAll: () => void;
 };
 
-export function BundleList({ query, bundles, loading, onSelectBundle, onBrowseAll }: Props) {
-  const [atBottom, setAtBottom] = useState(false);
-  const [atTop, setAtTop] = useState(true);
-  // Measured from the first rendered row — avoids hardcoding a dp constant that
-  // may not match the actual font/layout metrics on the device.
-  const [rowH, setRowH] = useState(0);
-
+export function BundleList({ bundles, loading, onSelectBundle, onBrowseAll }: Props) {
   if (loading) {
     return (
       <View style={[styles.card, styles.loadingWrap]}>
@@ -27,82 +18,37 @@ export function BundleList({ query, bundles, loading, onSelectBundle, onBrowseAl
     );
   }
 
-  const q = query.trim().toLowerCase();
-  const filtered = bundles.filter(
-    (b) =>
-      !q ||
-      b.name.toLowerCase().includes(q) ||
-      b.tag.toLowerCase().includes(q) ||
-      b.ingredients.some((i) => i.name.toLowerCase().includes(q))
-  );
-
-  const clipH = rowH > 0 ? rowH * 4.5 : undefined; // 4.5 rows — clips halfway into the 5th row's name text regardless of font height
-  const overflowing = filtered.length > 4;
-
-  function handleScroll(e: any) {
-    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    setAtTop(contentOffset.y < 4);
-    setAtBottom(contentOffset.y + layoutMeasurement.height >= contentSize.height - 4);
+  if (bundles.length === 0) {
+    return null;
   }
-
-  const countLabel =
-    filtered.length === 1
-      ? `1 bundle${q ? ' found' : ''}`
-      : `${filtered.length} bundles${q ? ' found' : ''}`;
 
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
-        <Text style={styles.headerText}>{countLabel}</Text>
+        <Text style={styles.headerText}>Suggested</Text>
       </View>
 
-      {filtered.length > 0 ? (
-        <View style={{ position: 'relative' }}>
-          <ScrollView
-            style={overflowing && clipH != null ? { height: clipH } : undefined}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-            showsVerticalScrollIndicator={false}
+      <View>
+        {bundles.map((bundle, idx) => (
+          <TouchableOpacity
+            key={bundle.id}
+            style={[styles.row, idx < bundles.length - 1 && styles.rowDivider]}
+            onPress={() => onSelectBundle(bundle)}
+            activeOpacity={0.7}
           >
-            {filtered.map((bundle, idx) => (
-              <TouchableOpacity
-                key={bundle.id}
-                style={[styles.row, idx < filtered.length - 1 && styles.rowDivider]}
-                onPress={() => onSelectBundle(bundle)}
-                onLayout={
-                  idx === 0 && rowH === 0
-                    ? (e) => setRowH(e.nativeEvent.layout.height)
-                    : undefined
-                }
-                activeOpacity={0.7}
-              >
-                <View style={[styles.emojiTile, { backgroundColor: bundle.color + '1f' }]}>
-                  <Text style={styles.emojiText}>{bundle.icon}</Text>
-                </View>
-                <View style={styles.textBlock}>
-                  <Text style={styles.bundleName}>{bundle.name}</Text>
-                  <Text style={styles.bundleMeta}>
-                    {bundle.ingredients.length} ingredients · {bundle.tag}
-                  </Text>
-                </View>
-                <ChevronRight size={14} color="#D2691E" />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {overflowing && !atBottom && !atTop && (
-            <LinearGradient
-              colors={['rgba(255,250,245,0)', '#FFFAF5']}
-              pointerEvents="none"
-              style={styles.fadeOverlay}
-            />
-          )}
-        </View>
-      ) : (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No bundles match “{query}”.</Text>
-        </View>
-      )}
+            <View style={[styles.emojiTile, { backgroundColor: bundle.color + '1f' }]}>
+              <Text style={styles.emojiText}>{bundle.icon}</Text>
+            </View>
+            <View style={styles.textBlock}>
+              <Text style={styles.bundleName}>{bundle.name}</Text>
+              <Text style={styles.bundleMeta}>
+                {bundle.ingredients.length} ingredients · {bundle.tag}
+              </Text>
+            </View>
+            <ChevronRight size={14} color="#D2691E" />
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <TouchableOpacity style={styles.footer} onPress={onBrowseAll} activeOpacity={0.7}>
         <LayoutGrid size={13} color="#D2691E" />
@@ -172,24 +118,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(44,24,16,0.5)',
     marginTop: 2,
-  },
-  fadeOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 36,
-  },
-  emptyState: {
-    paddingVertical: 26,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: 'rgba(44,24,16,0.5)',
-    textAlign: 'center',
   },
   footer: {
     flexDirection: 'row',

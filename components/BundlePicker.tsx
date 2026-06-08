@@ -1,7 +1,8 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   Modal,
   TouchableOpacity,
   FlatList,
@@ -11,7 +12,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { X } from 'lucide-react-native';
+import { X, Search } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Bundle } from '@/lib/bundles';
 
@@ -25,6 +26,7 @@ type Props = {
 
 export function BundlePicker({ visible, bundles, loading, onPick, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  const [searchQuery, setSearchQuery] = useState('');
   const sheetY = useRef(new Animated.Value(700)).current;
   const settledY = useRef(700);
 
@@ -73,6 +75,7 @@ export function BundlePicker({ visible, bundles, loading, onPick, onClose }: Pro
         settledY.current = 0;
       });
     } else {
+      setSearchQuery('');
       Animated.timing(sheetY, {
         toValue: 700,
         duration: 250,
@@ -83,6 +86,15 @@ export function BundlePicker({ visible, bundles, loading, onPick, onClose }: Pro
       });
     }
   }, [visible]);
+
+  const q = searchQuery.trim().toLowerCase();
+  const displayed = q
+    ? bundles.filter(b =>
+        b.name.toLowerCase().includes(q) ||
+        b.tag.toLowerCase().includes(q) ||
+        b.ingredients.some(i => i.name.toLowerCase().includes(q))
+      )
+    : bundles;
 
   function renderItem({ item }: { item: Bundle }) {
     return (
@@ -133,6 +145,24 @@ export function BundlePicker({ visible, bundles, loading, onPick, onClose }: Pro
             </View>
           </View>
 
+          <View style={styles.searchWrap}>
+            <View style={styles.searchRow}>
+              <Search size={16} color="#9C7B6A" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search bundles..."
+                placeholderTextColor="#B8A898"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
+                  <X size={14} color="#9C7B6A" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
           {loading ? (
             <View style={styles.loadingWrap}>
               <ActivityIndicator size="small" color="#D2691E" />
@@ -140,7 +170,7 @@ export function BundlePicker({ visible, bundles, loading, onPick, onClose }: Pro
           ) : (
           <FlatList
             key="bundlepicker"
-            data={bundles}
+            data={displayed}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
             numColumns={2}
@@ -215,6 +245,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDE7DC',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  searchWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5EFE6',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E8E0D0',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2C1810',
+    fontFamily: 'Inter_400Regular',
+    paddingVertical: 0,
   },
   columnWrapper: {
     gap: 10,
