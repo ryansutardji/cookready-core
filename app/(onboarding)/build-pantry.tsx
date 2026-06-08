@@ -41,9 +41,9 @@ type MeterSlot = {
 
 const METER_SLOTS: MeterSlot[] = [
   { key: 'protein',   label: 'Protein',     icon: '🥩', required: true,  minCount: 1, categories: ['Protein'] },
-  { key: 'vegetable', label: 'Vegetable',   icon: '🥦', required: true,  minCount: 1, categories: ['Vegetable'] },
+  { key: 'vegetable', label: 'Veggie',      icon: '🥦', required: true,  minCount: 1, categories: ['Vegetable'] },
   { key: 'grain',     label: 'Grain',       icon: '🌾', required: true,  minCount: 1, categories: ['Grain'] },
-  { key: 'spice',     label: 'Spice/Sauce', icon: '🌶️', required: true,  minCount: 5, categories: ['Spice/Sauce'] },
+  { key: 'spice',     label: 'Spice\n/Sauce', icon: '🌶️', required: true,  minCount: 5, categories: ['Spice/Sauce'] },
   { key: 'oil',       label: 'Oil',         icon: '🫒', required: true,  minCount: 1, categories: ['Oil', 'Fat'] },
   { key: 'fruit',     label: 'Fruit',       icon: '🍓', required: false, minCount: 1, categories: ['Fruit'] },
   { key: 'baking',    label: 'Baking',      icon: '🥣', required: false, minCount: 1, categories: ['Baking'] },
@@ -117,11 +117,13 @@ function CompositionMeter({ counts }: { counts: Record<string, number> }) {
                   <Text style={meterStyles.slotIcon}>{slot.icon}</Text>
                 )}
               </View>
-              <Text style={[
-                meterStyles.slotLabel,
-                { fontFamily: 'Inter_400Regular' },
-                met && (slot.required ? meterStyles.slotLabelMet : meterStyles.slotLabelOptionalMet),
-              ]} numberOfLines={1}>
+              <Text
+                style={[
+                  meterStyles.slotLabel,
+                  { fontFamily: 'Inter_400Regular' },
+                  met && (slot.required ? meterStyles.slotLabelMet : meterStyles.slotLabelOptionalMet),
+                ]}
+              >
                 {slot.label}
               </Text>
               {slot.minCount > 1 && (
