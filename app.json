@@ -8,8 +8,14 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cookready.app"
     },
     "web": {
       "bundler": "metro",
@@ -25,8 +31,12 @@
       "typedRoutes": true
     },
     "android": {
-      "package": "com.anonymous.cookready",
-      "softwareKeyboardLayoutMode": "pan"
+      "package": "com.cookready.app",
+      "softwareKeyboardLayoutMode": "pan",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      }
     }
   }
 }
