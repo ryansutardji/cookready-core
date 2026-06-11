@@ -15,7 +15,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cookready.app"
+      "bundleIdentifier": "com.cookready.app",
+      "buildNumber": "1"
     },
     "web": {
       "bundler": "metro",
@@ -36,6 +37,12 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#be4b1b"
+      }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "18e6b991-20a9-42ec-9612-c3ba6321961f"
       }
     }
   }
