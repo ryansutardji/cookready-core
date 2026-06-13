@@ -18,6 +18,33 @@ import { supabase } from '@/lib/supabase';
 import type { PantryItem } from '@/lib/supabase';
 import { ChatMessage } from '@/components/ChatMessage';
 import type { Message } from '@/components/ChatMessage';
+import { RecipeLimitIndicator } from '@/components/RecipeLimitIndicator';
+
+function getResetTimeString(): string {
+  const now = new Date();
+  // Find next midnight in America/Los_Angeles by checking hour-by-hour forward
+  // More reliably: compute via known UTC offset
+  // PST = UTC-8, PDT = UTC-7. Get tomorrow midnight LA in UTC:
+  const laDateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+  const [y, m, d] = laDateStr.split('-').map(Number);
+  // Try both UTC-8 and UTC-7 offsets to find which produces midnight in LA
+  for (const offsetHours of [8, 7]) {
+    const candidate = new Date(Date.UTC(y, m - 1, d + 1, offsetHours, 0, 0));
+    const check = candidate.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    const [cy, cm, cd] = check.split('-').map(Number);
+    if (cd === d + 1 || (d === 31 && cd === 1)) { // handles month rollover roughly
+      // Verify hour is 0 in LA
+      const hourInLA = parseInt(
+        candidate.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', hour12: false })
+      );
+      if (hourInLA === 0 || hourInLA === 24) {
+        return candidate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      }
+    }
+  }
+  // Fallback: just return "12:00 AM" (midnight PST is 12:00 AM local for PST users)
+  return '12:00 AM';
+}
 
 async function callChefFunction(
   message: string,
@@ -29,12 +56,17 @@ async function callChefFunction(
   });
 
   if (error) {
-    let detail = error.message;
+    // Parse the structured error body before falling back to a generic message.
     try {
       const body = await (error as any).context?.json();
-      if (body?.error) detail = body.error;
-    } catch { /* ignore parse errors */ }
-    throw new Error(`Chef error: ${detail}`);
+      if (body?.error === 'daily_limit_reached') {
+        throw new Error('DAILY_LIMIT_REACHED');
+      }
+    } catch (parseErr: any) {
+      // Re-throw if it's already our sentinel error, otherwise fall through.
+      if (parseErr.message === 'DAILY_LIMIT_REACHED') throw parseErr;
+    }
+    throw new Error(`Chef error: ${error.message}`);
   }
 
   if (!data) {
@@ -67,6 +99,8 @@ export default function ChefScreen() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
+  const [dailyRemaining, setDailyRemaining] = useState<number | null>(null);
+  const [isUnlimited, setIsUnlimited] = useState(false);
   const [showAbuseModal, setShowAbuseModal] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -84,6 +118,28 @@ export default function ChefScreen() {
           .from('ai_pantry_snapshot')
           .select('name, category, human_readable_inventory');
         if (data) setPantryItems(data as PantryItem[]);
+
+        // Load profile unlimited flag
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('unlimited_recipes')
+            .eq('id', user.id)
+            .single();
+          const unlimited = profile?.unlimited_recipes === true;
+          setIsUnlimited(unlimited);
+
+          if (!unlimited) {
+            const pstDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+            const { data: usage } = await supabase
+              .from('daily_ai_usage')
+              .select('request_count')
+              .eq('usage_date', pstDate)
+              .maybeSingle();
+            setDailyRemaining(Math.max(0, 5 - (usage?.request_count ?? 0)));
+          }
+        }
       }
       loadPantry();
     }, [])
@@ -129,6 +185,10 @@ export default function ChefScreen() {
 
       setMessages((prev) => [...prev, assistantMessage]);
 
+      if (!isUnlimited) {
+        setDailyRemaining(prev => prev !== null ? Math.max(0, prev - 1) : null);
+      }
+
       const lowerText = responseText.toLowerCase();
       const isOffTopic =
         offTopic ||
@@ -155,10 +215,14 @@ export default function ChefScreen() {
         }
       }
     } catch (err: any) {
+      const isDailyLimit = err.message === 'DAILY_LIMIT_REACHED';
+      if (isDailyLimit) setDailyRemaining(0);
       const errorMessage: Message = {
         id: uid(),
         role: 'assistant',
-        text: `Sorry, I encountered an error: ${err.message ?? 'Please check your Gemini API key and try again.'}`,
+        text: isDailyLimit
+          ? "You've reached your 5 daily AI Chef requests. Your limit resets at midnight PST — come back tomorrow for more recipe ideas!"
+          : `Sorry, I encountered an error: ${err.message ?? 'Please check your Gemini API key and try again.'}`,
         recipes: [],
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -338,6 +402,12 @@ export default function ChefScreen() {
       </Modal>
 
       <View style={[styles.inputContainer, { paddingBottom: TAB_BAR_HEIGHT + 8 }]}>
+        {!isUnlimited && dailyRemaining !== null && (
+          <RecipeLimitIndicator
+            remaining={dailyRemaining}
+            resetTime={getResetTimeString()}
+          />
+        )}
         <View style={styles.inputRow}>
           <TextInput
             value={input}
@@ -351,10 +421,10 @@ export default function ChefScreen() {
           />
           <TouchableOpacity
             onPress={() => handleSend()}
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || loading || (!isUnlimited && dailyRemaining === 0)}
             style={[
               styles.sendButton,
-              { opacity: !input.trim() || loading ? 0.4 : 1 },
+              { opacity: !input.trim() || loading || (!isUnlimited && dailyRemaining === 0) ? 0.4 : 1 },
             ]}
           >
             <Send size={16} color="#fff" />

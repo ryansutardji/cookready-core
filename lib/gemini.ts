@@ -51,6 +51,16 @@ export async function sendChatMessage(
 
   if (error) {
     console.error('Edge function error:', JSON.stringify(error));
+    // Attempt to parse a structured error body from the 429 response.
+    try {
+      const body = await (error as any).context?.json();
+      if (body?.error === 'daily_limit_reached') {
+        throw new Error('DAILY_LIMIT_REACHED');
+      }
+    } catch (parseErr: any) {
+      // Re-throw if it's already our sentinel error, otherwise fall through.
+      if (parseErr.message === 'DAILY_LIMIT_REACHED') throw parseErr;
+    }
     throw new Error(error.message ?? 'Edge function request failed');
   }
 

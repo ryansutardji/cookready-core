@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai@^0.24.1';
+import { createClient } from 'npm:@supabase/supabase-js@^2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,12 +80,81 @@ Rules for the JSON block:
 - If not suggesting any recipe, leave "recipes" as an empty array []
 - Use the exact ingredient name from the pantry data for "name" fields so they can be matched when depleting stock`;
 
+const DAILY_REQUEST_LIMIT = 5;
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
+    // --- Auth check ---
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const jwt = authHeader.replace('Bearer ', '');
+
+    // Use the admin client (service role) so we can read/write daily_ai_usage
+    // regardless of RLS, and to verify the JWT without a round-trip to auth.users via anon key.
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { persistSession: false } }
+    );
+
+    // Resolve the user from the JWT — getUser validates the token server-side.
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const userId = user.id;
+
+    // --- Unlimited bypass check ---
+    // Fetch the user's profile to see if they have unlimited recipe generation.
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('unlimited_recipes')
+      .eq('id', userId)
+      .single();
+    const isUnlimited = profile?.unlimited_recipes === true;
+
+    // --- Per-user daily rate limit check (skipped for unlimited users) ---
+    // Use PST date so the daily limit resets at midnight Pacific time.
+    const pstDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+
+    if (!isUnlimited) {
+      const { data: usageRow, error: usageReadError } = await supabaseAdmin
+        .from('daily_ai_usage')
+        .select('request_count')
+        .eq('user_id', userId)
+        .eq('usage_date', pstDateStr)
+        .maybeSingle();
+
+      if (usageReadError) {
+        console.error('[generate-recipe] usage read error:', usageReadError);
+        return new Response(
+          JSON.stringify({ error: 'Internal server error' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const currentCount = usageRow?.request_count ?? 0;
+      if (currentCount >= DAILY_REQUEST_LIMIT) {
+        return new Response(
+          JSON.stringify({ error: 'daily_limit_reached', limit: DAILY_REQUEST_LIMIT, reset: 'midnight PST' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // --- Existing Gemini API key check ---
     const apiKey = Deno.env.get('AI_RECIPE_GENERATOR');
     if (!apiKey) {
       return new Response(
@@ -155,6 +225,19 @@ Deno.serve(async (req: Request) => {
       }
     }
     if (lastErr) throw lastErr;
+
+    // --- Increment the user's daily usage count now that Gemini succeeded ---
+    // Skipped for unlimited users. Uses PST date to match the rate-limit check above.
+    if (!isUnlimited) {
+      const { error: upsertError } = await supabaseAdmin.rpc('increment_daily_ai_usage', {
+        p_user_id: userId,
+        p_usage_date: pstDateStr,
+      });
+      if (upsertError) {
+        // Log but don't fail the request — the recipe result is already in hand.
+        console.error('[generate-recipe] usage upsert error:', upsertError);
+      }
+    }
 
     const SAFETY_DECLINE_MESSAGES: Record<string, string> = {
       baby: "Due to the complexities of dietary requirements and safety considerations for babies, I'm not able to recommend a recipe that claims to be baby-friendly. Please consult with your pediatrician for appropriate guidance.",

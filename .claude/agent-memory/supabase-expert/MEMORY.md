@@ -1,1 +1,2 @@
 - [Migration History Sync](project_migration_sync.md) — Local/remote histories diverge; run `migration list` + `repair` before `db push`, use `ON CONFLICT DO NOTHING` for ingredient inserts
+- [Daily AI Rate Limit](project_daily_rate_limit.md) — generate-recipe has 10 req/day/user via daily_ai_usage table + increment_daily_ai_usage RPC; classify-ingredient is exempt
