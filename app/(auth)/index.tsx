@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,23 @@ import {
   StyleSheet,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
+import { consumePendingLockout } from '@/lib/lockout-store';
 
 type Mode = 'login' | 'signup';
+
+function formatLockoutMessage(lockedUntil: Date): string {
+  const totalMs = lockedUntil.getTime() - Date.now();
+  const totalMinutes = Math.ceil(totalMs / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0 && minutes > 0) {
+    return `Your account is locked due to misuse of the AI Chef. Try again in ${hours} hour${hours !== 1 ? 's' : ''} and ${minutes} minute${minutes !== 1 ? 's' : ''}.`;
+  }
+  if (hours > 0) {
+    return `Your account is locked due to misuse of the AI Chef. Try again in ${hours} hour${hours !== 1 ? 's' : ''}.`;
+  }
+  return `Your account is locked due to misuse of the AI Chef. Try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.`;
+}
 
 const CREAM = '#FFFAF5';
 const ESPRESSO = '#2D241E';
@@ -28,6 +43,13 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const lockedUntil = consumePendingLockout();
+    if (lockedUntil) {
+      setError(formatLockoutMessage(new Date(lockedUntil)));
+    }
+  }, []);
 
   async function handleSubmit() {
     setLoading(true);

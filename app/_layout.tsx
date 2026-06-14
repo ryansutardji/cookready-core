@@ -9,6 +9,7 @@ import { NotoSerif_700Bold } from '@expo-google-fonts/noto-serif';
 import { Inter_400Regular } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { supabase } from '@/lib/supabase';
+import { setPendingLockout } from '@/lib/lockout-store';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 SplashScreen.preventAutoHideAsync();
@@ -62,7 +63,7 @@ export default function RootLayout() {
         const [profileResult, pantryResult] = await Promise.all([
           supabase
             .from('profiles')
-            .select('has_completed_onboarding')
+            .select('has_completed_onboarding, locked_until')
             .eq('id', session.user.id)
             .maybeSingle(),
           supabase
@@ -70,6 +71,13 @@ export default function RootLayout() {
             .select('id', { count: 'exact', head: true })
             .gt('current_quantity_value', 0),
         ]);
+
+        const lockedUntil = profileResult.data?.locked_until;
+        if (lockedUntil && new Date(lockedUntil) > new Date()) {
+          setPendingLockout(lockedUntil);
+          await supabase.auth.signOut();
+          return;
+        }
 
         const onboardingCompleted = profileResult.data?.has_completed_onboarding === true;
         const pantryCount = pantryResult.count ?? 0;
