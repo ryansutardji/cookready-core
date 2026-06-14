@@ -49,10 +49,12 @@ function getResetTimeString(): string {
 async function callChefFunction(
   message: string,
   history: { role: 'user' | 'model'; parts: string }[],
-  pantryContext: string
+  pantryContext: string,
+  sessionId: string,
+  isSafetyDeclineRepeat: boolean
 ) {
   const { data, error } = await supabase.functions.invoke('generate-recipe', {
-    body: { message, history, pantryContext },
+    body: { message, history, pantryContext, sessionId, isSafetyDeclineRepeat },
   });
 
   if (error) {
@@ -78,6 +80,13 @@ async function callChefFunction(
 
 function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function uuidv4(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
 }
 
 const WELCOME_MESSAGE: Message = {
@@ -110,6 +119,8 @@ export default function ChefScreen() {
 
   const chatHistory = useRef<{ role: 'user' | 'model'; parts: string }[]>([]);
   const offTopicCount = useRef(0);
+  const safetyDeclineCount = useRef(0);
+  const sessionId = useRef(uuidv4());
 
   useFocusEffect(
     useCallback(() => {
@@ -134,10 +145,10 @@ export default function ChefScreen() {
             const pstDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
             const { data: usage } = await supabase
               .from('daily_ai_usage')
-              .select('request_count')
+              .select('recipe_count')
               .eq('usage_date', pstDate)
               .maybeSingle();
-            setDailyRemaining(Math.max(0, 5 - (usage?.request_count ?? 0)));
+            setDailyRemaining(Math.max(0, 5 - (usage?.recipe_count ?? 0)));
           }
         }
       }
@@ -167,11 +178,13 @@ export default function ChefScreen() {
         ? 'The pantry is currently empty.'
         : pantryItems.map((i) => `${i.category}: ${i.name} (${i.human_readable_inventory})`).join('\n');
 
-      const data = await callChefFunction(messageText, chatHistory.current, pantryContext);
+      const data = await callChefFunction(messageText, chatHistory.current, pantryContext, sessionId.current, safetyDeclineCount.current > 0);
 
       const responseText: string = data.text ?? '';
       const recipes = data.recipes ?? [];
       const offTopic: boolean = data.offTopic === true;
+      const safetyDecline: string | null = data.safetyDecline ?? null;
+      const deferred: boolean = data.deferred === true;
 
       chatHistory.current.push({ role: 'user', parts: messageText });
       chatHistory.current.push({ role: 'model', parts: responseText });
@@ -184,10 +197,6 @@ export default function ChefScreen() {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-
-      if (!isUnlimited) {
-        setDailyRemaining(prev => prev !== null ? Math.max(0, prev - 1) : null);
-      }
 
       const lowerText = responseText.toLowerCase();
       const isOffTopic =
@@ -204,7 +213,16 @@ export default function ChefScreen() {
         lowerText.includes("cooking and recipes") && lowerText.includes("only") ||
         lowerText.includes("politely decline");
 
-      if (isOffTopic) {
+      if (safetyDecline) {
+        safetyDeclineCount.current += 1;
+        if (safetyDeclineCount.current > 1) {
+          offTopicCount.current += 1;
+          if (offTopicCount.current === 3) setShowAbuseModal(true);
+          else if (offTopicCount.current === 4) setShowWarningModal(true);
+          else if (offTopicCount.current >= 5) setShowLogoutModal(true);
+        }
+      } else if (isOffTopic) {
+        // Off-topic — counts toward session logout, not daily quota.
         offTopicCount.current += 1;
         if (offTopicCount.current === 3) {
           setShowAbuseModal(true);
@@ -212,6 +230,13 @@ export default function ChefScreen() {
           setShowWarningModal(true);
         } else if (offTopicCount.current >= 5) {
           setShowLogoutModal(true);
+        }
+      } else if (deferred) {
+        // User explicitly asked to hold off on a recipe — free pass, tracked server-side.
+      } else {
+        // Real recipe — decrement daily quota display.
+        if (!isUnlimited) {
+          setDailyRemaining(prev => prev !== null ? Math.max(0, prev - 1) : null);
         }
       }
     } catch (err: any) {
@@ -390,6 +415,7 @@ export default function ChefScreen() {
               style={styles.modalButton}
               onPress={async () => {
                 setShowLogoutModal(false);
+                try { await supabase.rpc('apply_abuse_lockout'); } catch (_) {}
                 await supabase.auth.signOut();
               }}
             >

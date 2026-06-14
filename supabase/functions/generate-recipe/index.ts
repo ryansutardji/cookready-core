@@ -36,10 +36,10 @@ const SYSTEM_PROMPT = `You are CookReady's AI Chef, a warm, knowledgeable culina
 - **All others:** For all other ingredients, use the same units already present in the pantry data
 
 ### DIETARY SAFETY DISCLAIMER
-- If the user's message expresses clear intent to feed a recipe to a baby or a dog (e.g., "baby-friendly meal", "safe for my baby", "dog-safe treat", "for my dog to eat"), you MUST decline and NOT suggest a recipe.
-- This rule does NOT trigger when "baby" or "dog" appears incidentally as part of an ingredient or dish name (e.g., "baby spinach", "baby back ribs", "hot dog buns", "baby carrots"). Only trigger when the user's clear intent is to feed the dish to a baby or a dog.
+- If the user's message expresses clear intent to feed a recipe to a baby or any animal/pet (e.g., "baby-friendly meal", "safe for my baby", "dog-safe treat", "for my cat to eat", "bird-safe recipe", "hamster food"), you MUST decline and NOT suggest a recipe.
+- This rule does NOT trigger when "baby", "dog", or animal names appear incidentally as part of an ingredient or dish name (e.g., "baby spinach", "baby back ribs", "hot dog buns", "baby carrots", "rabbit stew", "duck breast"). Only trigger when the user's clear intent is to feed the dish to a baby or an animal.
 - When declining for a baby request: set "safety_decline": "baby" in the JSON, leave "recipes": []
-- When declining for a dog request: set "safety_decline": "dog" in the JSON, leave "recipes": []
+- When declining for any animal/pet request: set "safety_decline": "pet" in the JSON, leave "recipes": []
 - Your text response when declining can be a single brief sentence — the app will display the official safety message automatically.
 - **First occurrence** in the conversation: set "off_topic": false
 - **Repeat occurrence** (you have already set safety_decline earlier in the conversation history): set "off_topic": true
@@ -48,6 +48,8 @@ const SYSTEM_PROMPT = `You are CookReady's AI Chef, a warm, knowledgeable culina
 - Suggest recipes using ONLY ingredients in the provided pantry snapshot.
 - Keep your tone warm, encouraging, and concise.
 - If the user's message is clearly unrelated to cooking, recipes, food, or ingredients (e.g. asking about weather, news, coding, math, general trivia, or any non-food topic), politely decline and explain that you are only able to help with recipes and cooking.
+- If the user's message is cooking-related but does NOT explicitly ask you to hold off on a recipe, always resolve your answer into a recipe suggestion. For example, "what protein-rich meat do I have?" should become a brief answer followed by a recipe using that protein.
+- If the user explicitly asks you NOT to generate a recipe yet (e.g. "don't make a recipe yet", "just answer my question first", "hold off on the recipe", "I'm not ready for a recipe"), respond conversationally and helpfully, but keep your response brief and focused on moving toward a recipe. Set "deferred": true in the JSON block and leave "recipes": [].
 - When you suggest a recipe, your TEXT response must ONLY contain a brief 1-3 sentence intro (e.g. the dish name and why it suits the request). Do NOT list ingredients, quantities, instructions, servings, or any recipe details in the text — all of that is displayed automatically in a recipe card below your message. Repeating recipe details in your text response is strictly forbidden.
 
 ALWAYS end every response with this exact JSON block (no extra text after it):
@@ -56,13 +58,15 @@ ALWAYS end every response with this exact JSON block (no extra text after it):
 {
   "off_topic": false,
   "safety_decline": null,
+  "deferred": false,
   "recipes": []
 }
 \`\`\`
 
 Rules for the JSON block:
 - Set "off_topic" to true if the user's message is unrelated to cooking, food, or recipes; otherwise false
-- Set "safety_decline" to "baby" or "dog" when declining a dietary safety request (see DIETARY SAFETY DISCLAIMER); otherwise null
+- Set "safety_decline" to "baby" (for baby requests) or "pet" (for any animal/pet request) when declining a dietary safety request (see DIETARY SAFETY DISCLAIMER); otherwise null
+- Set "deferred" to true only when the user explicitly asks you not to generate a recipe yet; otherwise false
 - When suggesting a recipe, put it in the "recipes" array using this shape:
   {
     "name": "Recipe Name",
@@ -81,6 +85,12 @@ Rules for the JSON block:
 - Use the exact ingredient name from the pantry data for "name" fields so they can be matched when depleting stock`;
 
 const DAILY_REQUEST_LIMIT = 5;
+
+// Returns true if the string is a valid UUID v4 (or any standard UUID format).
+function isValidUuid(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -132,7 +142,7 @@ Deno.serve(async (req: Request) => {
     if (!isUnlimited) {
       const { data: usageRow, error: usageReadError } = await supabaseAdmin
         .from('daily_ai_usage')
-        .select('request_count')
+        .select('recipe_count')
         .eq('user_id', userId)
         .eq('usage_date', pstDateStr)
         .maybeSingle();
@@ -145,7 +155,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const currentCount = usageRow?.request_count ?? 0;
+      const currentCount = usageRow?.recipe_count ?? 0;
       if (currentCount >= DAILY_REQUEST_LIMIT) {
         return new Response(
           JSON.stringify({ error: 'daily_limit_reached', limit: DAILY_REQUEST_LIMIT, reset: 'midnight PST' }),
@@ -164,11 +174,17 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { message, history, pantryContext } = body as {
+    const { message, history, pantryContext, sessionId: rawSessionId, isSafetyDeclineRepeat } = body as {
       message: string;
       history: { role: 'user' | 'model'; parts: string }[];
       pantryContext: string;
+      sessionId?: unknown;
+      isSafetyDeclineRepeat?: unknown;
     };
+
+    // sessionId is optional — only used for event tracking. Validate before use.
+    const sessionId: string | null = isValidUuid(rawSessionId) ? rawSessionId : null;
+    const isRepeatSafetyDecline = isSafetyDeclineRepeat === true;
 
     if (!message) {
       return new Response(
@@ -226,37 +242,27 @@ Deno.serve(async (req: Request) => {
     }
     if (lastErr) throw lastErr;
 
-    // --- Increment the user's daily usage count now that Gemini succeeded ---
-    // Skipped for unlimited users. Uses PST date to match the rate-limit check above.
-    if (!isUnlimited) {
-      const { error: upsertError } = await supabaseAdmin.rpc('increment_daily_ai_usage', {
-        p_user_id: userId,
-        p_usage_date: pstDateStr,
-      });
-      if (upsertError) {
-        // Log but don't fail the request — the recipe result is already in hand.
-        console.error('[generate-recipe] usage upsert error:', upsertError);
-      }
-    }
-
+    // --- Parse the Gemini response ---
     const SAFETY_DECLINE_MESSAGES: Record<string, string> = {
       baby: "Due to the complexities of dietary requirements and safety considerations for babies, I'm not able to recommend a recipe that claims to be baby-friendly. Please consult with your pediatrician for appropriate guidance.",
-      dog: "Due to the complexities of dietary requirements and safety considerations for dogs, I'm not able to recommend a recipe that claims to be dog-friendly. Please consult with your veterinarian for appropriate guidance.",
+      pet: "Due to the complexities of dietary requirements and safety considerations for pets, I'm not able to recommend a recipe that claims to be pet-friendly. Please consult with your veterinarian for appropriate guidance.",
     };
 
     const jsonMatches = [...rawText.matchAll(/```json\s*([\s\S]*?)```/g)];
     let recipes: unknown[] = [];
     let offTopic = false;
     let safetyDecline: string | null = null;
+    let deferred = false;
     let text = rawText;
 
     for (const jsonMatch of jsonMatches) {
       try {
         const parsed = JSON.parse(jsonMatch[1]);
-        if (typeof parsed === 'object' && parsed !== null && ('off_topic' in parsed || 'recipes' in parsed || 'safety_decline' in parsed)) {
+        if (typeof parsed === 'object' && parsed !== null && ('off_topic' in parsed || 'recipes' in parsed || 'safety_decline' in parsed || 'deferred' in parsed)) {
           if (Array.isArray(parsed.recipes)) recipes = parsed.recipes;
           if (parsed.off_topic === true) offTopic = true;
           if (typeof parsed.safety_decline === 'string') safetyDecline = parsed.safety_decline;
+          if (parsed.deferred === true) deferred = true;
         }
       } catch {
         // skip unparseable blocks
@@ -269,8 +275,41 @@ Deno.serve(async (req: Request) => {
       text = SAFETY_DECLINE_MESSAGES[safetyDecline];
     }
 
+    // --- Increment daily recipe count (only for real recipes, after parsing) ---
+    // Skipped for unlimited users, off-topic responses, and safety declines.
+    // Counting happens here — after parsing — so aborted or off-topic calls are never charged.
+    if (!isUnlimited && !offTopic && !safetyDecline && !deferred) {
+      const { error: upsertError } = await supabaseAdmin.rpc('increment_daily_recipe_count', {
+        p_user_id: userId,
+        p_usage_date: pstDateStr,
+      });
+      if (upsertError) {
+        // Log but don't fail the request — the recipe result is already in hand.
+        console.error('[generate-recipe] usage upsert error:', upsertError);
+      }
+    }
+
+    // --- Track off-topic / safety-decline events per session ---
+    // Only fires when a sessionId was provided and the response was not a real recipe.
+    // Failures are swallowed — event tracking must never block the response.
+    if ((offTopic || (safetyDecline && isRepeatSafetyDecline) || deferred) && sessionId !== null) {
+      try {
+        const { error: eventError } = await supabaseAdmin.rpc('increment_session_strike', {
+          p_user_id: userId,
+          p_session_id: sessionId,
+          p_usage_date: pstDateStr,
+          p_event_type: safetyDecline ? 'safety_decline' : offTopic ? 'off_topic' : 'deferred',
+        });
+        if (eventError) {
+          console.error('[generate-recipe] ai_event upsert error:', eventError);
+        }
+      } catch (eventErr) {
+        console.error('[generate-recipe] ai_event unexpected error:', eventErr);
+      }
+    }
+
     return new Response(
-      JSON.stringify({ text, recipes, offTopic }),
+      JSON.stringify({ text, recipes, offTopic, safetyDecline, deferred }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err: unknown) {
