@@ -367,7 +367,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
             </View>
 
             {showDropdown && (
-              <View style={styles.dropdown}>
+              <ScrollView style={styles.dropdown} keyboardShouldPersistTaps="handled">
                 {results.map((ing, idx) => (
                   <TouchableOpacity
                     key={ing.id}
@@ -410,7 +410,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
                     </TouchableOpacity>
                   </>
                 )}
-              </View>
+              </ScrollView>
             )}
           </>
         ) : !showNewIngredient ? (
@@ -707,6 +707,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFAF5',
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
+    maxHeight: 220,
   },
   dropdownItem: {
     paddingHorizontal: 16,
