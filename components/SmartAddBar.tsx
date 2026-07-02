@@ -60,6 +60,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
   const [showNewIngredient, setShowNewIngredient] = useState(false);
   const [newIngredientName, setNewIngredientName] = useState('');
   const [showAll, setShowAll] = useState(false);
+  const [fromBrowseAll, setFromBrowseAll] = useState(false);
   const [pinned, setPinned] = useState(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -281,6 +282,10 @@ export function SmartAddBar({ onItemAdded }: Props) {
 
   function handleSheetClose() {
     setSheetVisible(false);
+    if (fromBrowseAll) {
+      setShowAll(true);
+      setFromBrowseAll(false);
+    }
   }
 
   function handleBundleAdded() {
@@ -531,7 +536,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
         visible={showAll}
         bundles={bundles}
         loading={bundlesLoading}
-        onPick={(b) => { setShowAll(false); handleSelectBundle(b); }}
+        onPick={(b) => { setShowAll(false); setFromBrowseAll(true); handleSelectBundle(b); }}
         onClose={() => setShowAll(false)}
       />
     </View>
