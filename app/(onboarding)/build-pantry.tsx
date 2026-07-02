@@ -679,7 +679,7 @@ function SingleIngredientBar({ onAdded }: { onAdded: () => void }) {
             />
           </View>
           {showDropdown && results.length > 0 && (
-            <View style={singleStyles.dropdown}>
+            <ScrollView style={singleStyles.dropdown} keyboardShouldPersistTaps="handled">
               {results.map((ing, idx) => (
                 <TouchableOpacity
                   key={ing.id}
@@ -694,7 +694,7 @@ function SingleIngredientBar({ onAdded }: { onAdded: () => void }) {
                   <Text style={[singleStyles.dropdownUnits, { fontFamily: 'Inter_400Regular' }]}>{ing.units.slice(0, 3).join(', ')}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           )}
         </>
       ) : (
@@ -768,6 +768,7 @@ const singleStyles = StyleSheet.create({
     backgroundColor: '#FFFAF5',
     borderBottomLeftRadius: 14,
     borderBottomRightRadius: 14,
+    maxHeight: 220,
   },
   dropdownItem: { paddingHorizontal: 14, paddingVertical: 11, gap: 3 },
   dropdownDivider: { borderBottomWidth: 1, borderBottomColor: '#EDE8DE' },
