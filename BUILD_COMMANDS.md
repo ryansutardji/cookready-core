@@ -2,6 +2,10 @@
 
 ## EAS Cloud Builds
 
+## Start with
+
+eas login
+
 ### Android
 
 | Profile | Command | Output |
