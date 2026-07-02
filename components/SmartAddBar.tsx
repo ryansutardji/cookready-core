@@ -10,7 +10,7 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import { Mic, Plus, Check, ChevronDown, X, Package, Sparkles, Search, Pin } from 'lucide-react-native';
+import { Plus, Check, ChevronDown, X, Package, Sparkles, Search, Pin } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { BundleList } from '@/components/BundleList';
 import { BundleSheet } from '@/components/BundleSheet';
@@ -361,9 +361,6 @@ export function SmartAddBar({ onItemAdded }: Props) {
                 onChangeText={setQuery}
                 returnKeyType="search"
               />
-              <TouchableOpacity style={styles.micBtn}>
-                <Mic size={18} color="#D2691E" />
-              </TouchableOpacity>
             </View>
 
             {showDropdown && (
@@ -684,14 +681,6 @@ const styles = StyleSheet.create({
     color: '#2C1810',
     fontFamily: 'Inter_400Regular',
     paddingVertical: Platform.OS === 'android' ? 2 : 0,
-  },
-  micBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#EDE7DC',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   clearBtn: {
     width: 24,
