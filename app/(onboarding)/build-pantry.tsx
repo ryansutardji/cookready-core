@@ -752,6 +752,8 @@ const singleStyles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#E0D8CC',
     overflow: 'visible',
+    marginHorizontal: 16,
+    marginBottom: 8,
   },
   searchRow: {
     flexDirection: 'row',
@@ -933,6 +935,8 @@ export default function BuildPantryScreen() {
         ) : (
           <CompositionMeter counts={meterCounts} />
         )}
+
+        <SingleIngredientBar onAdded={handleAdded} />
       </View>
 
       {/* Scrollable content */}
@@ -960,11 +964,6 @@ export default function BuildPantryScreen() {
             />
           ))
         )}
-
-        <Text style={[screenStyles.sectionLabel, { fontFamily: 'Inter_400Regular', marginTop: 8 }]}>
-          Add individual ingredients
-        </Text>
-        <SingleIngredientBar onAdded={handleAdded} />
 
         {/* Spacer so content clears the fixed footer */}
         <View style={{ height: 100 }} />
@@ -1000,6 +999,7 @@ const screenStyles = StyleSheet.create({
     backgroundColor: '#FFFAF5',
     borderBottomWidth: 1,
     borderBottomColor: '#F0EAE0',
+    zIndex: 1,
   },
   stepRow: {
     flexDirection: 'row',
