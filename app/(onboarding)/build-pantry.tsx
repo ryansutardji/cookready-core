@@ -326,11 +326,12 @@ function BundleTile({
     setSaving(true);
     try {
       for (const row of checkedRows) {
-        await supabase.rpc('add_pantry_item', {
+        const { error } = await supabase.rpc('add_pantry_item', {
           p_ingredient_name: row.name,
           p_quantity: row.quantity,
           p_unit: row.selectedUnit,
         });
+        if (error) throw error;
       }
       onAdded();
       onToggle(); // collapse after adding
@@ -652,11 +653,12 @@ function SingleIngredientBar({ onAdded }: { onAdded: () => void }) {
     if (!selected || quantity <= 0 || !selectedUnit || saving) return;
     setSaving(true);
     try {
-      await supabase.rpc('add_pantry_item', {
+      const { error } = await supabase.rpc('add_pantry_item', {
         p_ingredient_name: selected.name,
         p_quantity: quantity,
         p_unit: selectedUnit,
       });
+      if (error) throw error;
       handleClear();
       onAdded();
     } finally {
