@@ -214,11 +214,12 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
     setSaving(true);
     try {
       for (const row of checkedRows) {
-        await supabase.rpc('add_pantry_item', {
+        const { error } = await supabase.rpc('add_pantry_item', {
           p_ingredient_name: row.name,
           p_quantity: row.quantity,
           p_unit: row.selectedUnit,
         });
+        if (error) throw error;
       }
       onAdded();
       handleClose();

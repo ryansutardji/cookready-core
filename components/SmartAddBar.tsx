@@ -200,11 +200,12 @@ export function SmartAddBar({ onItemAdded }: Props) {
         });
       }
 
-      await supabase.rpc('add_pantry_item', {
+      const { error: rpcError } = await supabase.rpc('add_pantry_item', {
         p_ingredient_name: ingredient.name,
         p_quantity: 1,
         p_unit: ingredient.preferred_unit,
       });
+      if (rpcError) throw rpcError;
 
       handleClear();
       onItemAdded();
