@@ -1,2 +1,4 @@
 - [Migration History Sync](project_migration_sync.md) — Local/remote histories diverge; run `migration list` + `repair` before `db push`, use `ON CONFLICT DO NOTHING` for ingredient inserts
 - [Daily AI Rate Limit](project_daily_rate_limit.md) — generate-recipe has 10 req/day/user via daily_ai_usage table + increment_daily_ai_usage RPC; classify-ingredient is exempt
+- [Test Infrastructure](project_test_infrastructure.md) — CLI pinned as npm devDep (v2.109.0), supabase/tests/ scaffolded, test:db needs `supabase start` + Docker first
+- [Pantry RPC Overloads](project_pantry_rpc_overloads.md) — add_pantry_item's stale 3-arg overload dropped 2026-07-05; PostgREST resolves overloads by named JSON keys, not arity
