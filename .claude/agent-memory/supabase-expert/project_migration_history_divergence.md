@@ -1,6 +1,6 @@
 ---
 name: project-migration-history-divergence
-description: 8 mismatched-version migrations reconciled 2026-07-06; add_pantry_item remote-history gap closed same day by backfilling 20260706052444; surfaced an unmerged branch (origin/backend_unit_tests) with the real test suite still awaiting a merge decision
+description: 8 mismatched-version migrations reconciled 2026-07-06; add_pantry_item remote-history gap closed same day by backfilling 20260706052444; origin/backend_unit_tests merged into main 2026-07-06, but left a duplicate add_pantry_item migration file (20260706045911 vs 20260706052444) with conflicting accounts of prod-deployment status, still unresolved
 metadata:
   type: project
 ---
@@ -50,41 +50,46 @@ assumption "`apply_migration` leaves no remote-tracked history row" was
 **wrong** — always verify directly against
 `supabase_migrations.schema_migrations` rather than assuming.
 
-**New discovery while closing the above (open, needs a user decision) —
-`origin/backend_unit_tests` is an unmerged branch that already did most of
-this work:** the "file doesn't exist anywhere in git history" claim above was
-almost right but not quite — a file for this same fix, under a *different*
-timestamp (`20260706045911`, matching what the docs originally described),
-plus a full 7-file pgTAP suite (`add_pantry_item` 7-case version including
-the ingredient-specific-vs-global tiebreak regression, `deplete_pantry_item`,
+**Update 2026-07-06 — `origin/backend_unit_tests` has since been merged into `main`
+via a plain `git pull`** (fast-forward, not a manual cherry-pick). `main` now has
+the full 7-file pgTAP suite (`add_pantry_item` 7-case version including the
+ingredient-specific-vs-global tiebreak regression, `deplete_pantry_item`,
 `apply_abuse_lockout`, `check_recipe_cookability`,
-`get_recipe_ingredient_statuses`, `increment_session_strike`,
-`rls_policies`), and an updated `supabase/seed.sql` (global grants for local
-pgTAP runs — see [[project_public_schema_grants_gap]]) all exist on commit
-`ce7c0b3` of `origin/backend_unit_tests`, one commit ahead of `main` — but
-that commit was **never merged**. Confirmed via `npx supabase test db` that
-`main`'s `supabase/tests/` currently has only the minimal one-case smoke test
-(`Files=1, Tests=1, PASS`) — the "case 5 regression test already added"
-claim in `TODO.md` was false for `main`, though seemingly true for the
-orphaned branch. Also found: the local dev Postgres instance already has a
-`schema_migrations` bookkeeping row for `20260706045911` (from a previous
-session applying that branch's file locally without ever committing it) —
-function body is correct locally, but this blocks `supabase migration up`
-until reconciled or the branch question is resolved first. Left open
-deliberately — merging/cherry-picking another branch's work and repairing
-local migration bookkeeping are user decisions, not something to do
-unilaterally. Full detail in `TODO.md` §2A and `supabase/CLAUDE.md`.
+`get_recipe_ingredient_statuses`, `increment_session_strike`, `rls_policies`),
+the updated `supabase/seed.sql` (global grants for local pgTAP runs — see
+[[project_public_schema_grants_gap]]), and its own migration file for the
+`add_pantry_item` fix under timestamp `20260706045911`. The "unmerged, awaiting
+a decision" framing this note previously used is now stale — the merge already
+happened.
+
+**What's still actually open — a duplicate migration file, with conflicting
+prod-status claims, not a merge decision:** the merge left TWO local migration
+files for the same fix — the pre-existing `20260706052444_fix_add_pantry_item_conversion_priority.sql`
+(created same day, believed to match the version tracked in prod's
+`schema_migrations` table) and the newly-merged `20260706045911_fix_add_pantry_item_conversion_priority.sql`
+(same function body, believed by [[project_unit_conversions_null_ordering]] to
+be local-only, not yet shipped to prod at all). These two accounts of prod
+status directly contradict each other and have **not** been reconciled — don't
+trust either until re-verified fresh against `supabase_migrations.schema_migrations`
+on the live project. Also unresolved: the local dev Postgres instance's
+`schema_migrations` table already has a bookkeeping row for `20260706045911`
+predating its file ever being committed to `main` (from a previous session
+applying it locally without committing), which blocks `supabase migration up`
+locally until repaired. Full detail and the fix commands are in
+`supabase/CLAUDE.md` → "Not yet resolved — duplicate `add_pantry_item`
+conversion-priority fix"; the actionable checklist is in `TODO.md` §2A.
 
 **How to apply:** Before trusting any doc claim that a specific migration
 file exists locally, grep/`find` `main`'s working tree first — a claim in
 `TODO.md`/memory is not the same as a file being on disk *on the branch
 you're checking* (see [[project_pantry_rpc_overloads]] for the same lesson
-applied to overload assumptions). It's also not the same as the file not
-existing *anywhere* — check other branches/remotes before concluding work
-was "never done," since it may just be unmerged. When using the MCP
-`apply_migration` tool for one-off prod fixes, create and commit the matching
-local migration file in the *same* change, and verify whether it registered
-a remote-tracked version via `schema_migrations` — don't assume either way.
+applied to overload assumptions). Similarly, don't trust a doc's claim about
+whether a fix reached production without checking `schema_migrations`
+directly — two notes here made opposite claims about the same fix and both
+can't be right. When using the MCP `apply_migration` tool for one-off prod
+fixes, create and commit the matching local migration file in the *same*
+change, and verify whether it registered a remote-tracked version via
+`schema_migrations` — don't assume either way.
 
 Related: [[project_migration_sync]], [[project_pantry_rpc_overloads]],
 [[project_test_infrastructure]]
