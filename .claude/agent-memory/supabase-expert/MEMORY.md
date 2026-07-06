@@ -1,4 +1,6 @@
 - [Migration History Sync](project_migration_sync.md) — Local/remote histories diverge; run `migration list` + `repair` before `db push`, use `ON CONFLICT DO NOTHING` for ingredient inserts
-- [Daily AI Rate Limit](project_daily_rate_limit.md) — generate-recipe has 10 req/day/user via daily_ai_usage table + increment_daily_ai_usage RPC; classify-ingredient is exempt
-- [Test Infrastructure](project_test_infrastructure.md) — CLI pinned as npm devDep (v2.109.0), supabase/tests/ scaffolded, test:db needs `supabase start` + Docker first
+- [Daily AI Rate Limit](project_daily_rate_limit.md) — generate-recipe rate-limits via daily_ai_usage.recipe_count + increment_daily_recipe_count RPC (renamed from request_count/increment_daily_ai_usage); classify-ingredient is exempt
+- [Test Infrastructure](project_test_infrastructure.md) — full pgTAP suite now in supabase/tests/ (28 assertions, 7 files) + supabase/seed.sql tests.create_test_user helper + base grants; test:db needs `db reset` after schema/seed changes
 - [Pantry RPC Overloads](project_pantry_rpc_overloads.md) — add_pantry_item's stale 3-arg overload dropped 2026-07-05; PostgREST resolves overloads by named JSON keys, not arity
+- [Public Schema Grants Gap](project_public_schema_grants_gap.md) — FIXED 2026-07-05 via supabase/seed.sql grants (local/CI-only); hosted project already had grants, not a prod bug
+- [Unit Conversions NULL Ordering](project_unit_conversions_null_ordering.md) — add_pantry_item's NULL-ordering tiebreak bug: FIXED locally 2026-07-06 (migration 20260706045911) + regression test; still TODO on hosted project
