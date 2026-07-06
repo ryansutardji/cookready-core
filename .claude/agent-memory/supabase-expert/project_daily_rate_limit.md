@@ -8,8 +8,8 @@ metadata:
 The `generate-recipe` edge function enforces a 5 requests/day per-user limit (PST day boundary), with a bypass for users whose `profiles.unlimited_recipes = true`.
 
 **Implementation:**
-- `public.daily_ai_usage` table: `(id, user_id, usage_date, request_count)` with unique constraint `(user_id, usage_date)`.
-- `public.increment_daily_ai_usage(p_user_id, p_usage_date)` SECURITY DEFINER RPC does the atomic upsert-increment.
+- `public.daily_ai_usage` table: `(id, user_id, usage_date, recipe_count)` with unique constraint `(user_id, usage_date)`. Column was originally `request_count`, renamed to `recipe_count` in `20260614000000_rename_request_count_to_recipe_count.sql` (confirmed 2026-07-05) to clarify only successful recipe responses are counted.
+- `public.increment_daily_recipe_count(p_user_id, p_usage_date)` SECURITY DEFINER RPC does the atomic upsert-increment — replaced the old `increment_daily_ai_usage` RPC in the same migration (old one is dropped, not just deprecated).
 - `profiles.unlimited_recipes boolean NOT NULL DEFAULT false` — set to true to give a user unlimited access.
 - Edge function flow after JWT validation:
   1. Fetch `profiles.unlimited_recipes` for the user.
