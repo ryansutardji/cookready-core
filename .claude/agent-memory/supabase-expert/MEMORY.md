@@ -3,4 +3,5 @@
 - [Test Infrastructure](project_test_infrastructure.md) — full pgTAP suite now in supabase/tests/ (28 assertions, 7 files) + supabase/seed.sql tests.create_test_user helper + base grants; test:db needs `db reset` after schema/seed changes
 - [Pantry RPC Overloads](project_pantry_rpc_overloads.md) — add_pantry_item's stale 3-arg overload dropped 2026-07-05; PostgREST resolves overloads by named JSON keys, not arity
 - [Public Schema Grants Gap](project_public_schema_grants_gap.md) — FIXED 2026-07-05 via supabase/seed.sql grants (local/CI-only); hosted project already had grants, not a prod bug
-- [Unit Conversions NULL Ordering](project_unit_conversions_null_ordering.md) — add_pantry_item's NULL-ordering tiebreak bug: FIXED locally 2026-07-06 (migration 20260706045911) + regression test; still TODO on hosted project
+- [Unit Conversions NULL Ordering](project_unit_conversions_null_ordering.md) — add_pantry_item's NULL-ordering tiebreak bug: fixed locally 2026-07-06 (migration 20260706045911) + regression test; prod-deployment status disputed — see [[project_migration_history_divergence]]
+- [Migration History Divergence](project_migration_history_divergence.md) — 8 migrations reconciled 2026-07-06; two candidate migration files (20260706045911, 20260706052444) now both claim to be the add_pantry_item fix — dedup + prod-status check still needed
