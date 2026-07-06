@@ -42,14 +42,20 @@
 
 The 8 migrations from `20260610000000` through `20260705221333` were applied on production under different version timestamps (one, `20260705221333_drop_stale_add_pantry_item_3arg_overload.sql`, also under a different name: `drop_old_add_pantry_item_overload`). Each was verified equivalent by diffing live prod definitions (`pg_get_functiondef`, `information_schema.columns`/`role_column_grants`, `pg_constraint`, `pg_indexes`) against the local files — grouped where migrations are links in the same rename chain (`daily_ai_usage`→`recipe_count`, `ai_events`→`session_strikes`) rather than checked independently, since an intermediate schema state can't be introspected after later migrations in the chain have already superseded it — then reconciled via `supabase migration repair --linked`. `npx supabase migration list` now shows a clean 1:1 match for these.
 
-### Not yet resolved — duplicate `add_pantry_item` conversion-priority fix
+### Resolved 2026-07-06 — duplicate `add_pantry_item` conversion-priority fix
 
-Two local migration files now exist for the same fix (the NULL-ordering tiebreak bug — see [[project_unit_conversions_null_ordering]]), under two different timestamps with the same function body: `20260706045911_fix_add_pantry_item_conversion_priority.sql` and `20260706052444_fix_add_pantry_item_conversion_priority.sql`.
+Two local migration files previously existed for the same fix (the NULL-ordering tiebreak bug — see [[project_unit_conversions_null_ordering]]), under two different timestamps with the same function body: `20260706045911_fix_add_pantry_item_conversion_priority.sql` and `20260706052444_fix_add_pantry_item_conversion_priority.sql`.
 
-These come with **conflicting accounts** of production status that haven't been reconciled:
-- One note claims `20260706052444` is the version actually tracked in production's `schema_migrations` table (checked directly via SQL), with its body pulled verbatim from prod via `pg_get_functiondef`.
-- [[project_unit_conversions_null_ordering]] instead claims the fix is **not yet shipped to production at all**, and only exists in the `20260706045911` file, applied to the local stack only.
+Checked fresh directly against production:
+- `SELECT version FROM supabase_migrations.schema_migrations WHERE version IN ('20260706045911','20260706052444')` → only `20260706052444` is present.
+- `pg_get_functiondef('public.add_pantry_item(text, numeric, text, boolean)')` on production matches the local `20260706052444_fix_add_pantry_item_conversion_priority.sql` file character-for-character.
 
-There's also a local dev-stack wrinkle: the local Postgres instance's `supabase_migrations.schema_migrations` table has a bookkeeping row for `20260706045911` that predates that file ever being committed to `main`, which can block `supabase migration up` locally (`LegacyMigrationMissingLocalError`) until reconciled. The local function body itself is already correct (verified against the local DB), so this is a bookkeeping-only mismatch — fixing it means running `supabase migration repair --status reverted 20260706045911` (clears the phantom local row) followed by `supabase migration up` (applies `20260706052444` for real, a no-op `CREATE OR REPLACE` given the body already matches) — but hold off until the branch/dedup question above is settled, since the answer may change which version numbers end up canonical locally.
+**`20260706052444` is the one true canonical migration, confirmed live on production.** `20260706045911` was a dead-end duplicate that only ever touched the local dev database (applied there in an earlier session before ever being committed to git).
 
-**Do not delete either migration file or run `migration repair` on this pair until the production status is verified fresh** — treat both prior accounts as unverified. See `TODO.md` §2A.
+Cleanup performed:
+- Deleted `20260706045911_fix_add_pantry_item_conversion_priority.sql`.
+- Repaired the local dev stack's phantom bookkeeping row: `supabase migration repair --status reverted 20260706045911 --local`, then `supabase migration up` (applied `20260706052444` locally — a no-op `CREATE OR REPLACE FUNCTION` since the body already matched).
+- Confirmed via `npx supabase migration list --local` and `npx supabase migration list` (linked) that local and remote now show a clean 1:1 match for every `2026070*` version.
+- Re-ran `supabase test db` locally: `Files=7, Tests=28, Result: PASS`.
+
+See `TODO.md` §2A (now fully closed).

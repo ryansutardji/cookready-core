@@ -1,6 +1,6 @@
 ---
 name: project-migration-history-divergence
-description: 8 mismatched-version migrations reconciled 2026-07-06; add_pantry_item remote-history gap closed same day by backfilling 20260706052444; origin/backend_unit_tests merged into main 2026-07-06, but left a duplicate add_pantry_item migration file (20260706045911 vs 20260706052444) with conflicting accounts of prod-deployment status, still unresolved
+description: 8 mismatched-version migrations reconciled 2026-07-06; add_pantry_item remote-history gap closed same day by backfilling 20260706052444; origin/backend_unit_tests merge briefly left a duplicate add_pantry_item migration file (20260706045911 vs 20260706052444) — resolved 2026-07-06, 20260706052444 confirmed canonical and live on prod, duplicate deleted, TODO.md §2A fully closed
 metadata:
   type: project
 ---
@@ -62,33 +62,36 @@ the updated `supabase/seed.sql` (global grants for local pgTAP runs — see
 a decision" framing this note previously used is now stale — the merge already
 happened.
 
-**What's still actually open — a duplicate migration file, with conflicting
-prod-status claims, not a merge decision:** the merge left TWO local migration
-files for the same fix — the pre-existing `20260706052444_fix_add_pantry_item_conversion_priority.sql`
-(created same day, believed to match the version tracked in prod's
-`schema_migrations` table) and the newly-merged `20260706045911_fix_add_pantry_item_conversion_priority.sql`
-(same function body, believed by [[project_unit_conversions_null_ordering]] to
-be local-only, not yet shipped to prod at all). These two accounts of prod
-status directly contradict each other and have **not** been reconciled — don't
-trust either until re-verified fresh against `supabase_migrations.schema_migrations`
-on the live project. Also unresolved: the local dev Postgres instance's
-`schema_migrations` table already has a bookkeeping row for `20260706045911`
-predating its file ever being committed to `main` (from a previous session
-applying it locally without committing), which blocks `supabase migration up`
-locally until repaired. Full detail and the fix commands are in
-`supabase/CLAUDE.md` → "Not yet resolved — duplicate `add_pantry_item`
-conversion-priority fix"; the actionable checklist is in `TODO.md` §2A.
+**Resolved 2026-07-06 — duplicate migration file dedup and prod-status confirmed:**
+the merge had left TWO local migration files for the same fix — the pre-existing
+`20260706052444_fix_add_pantry_item_conversion_priority.sql` and the
+newly-merged `20260706045911_fix_add_pantry_item_conversion_priority.sql`
+(same function body, conflicting accounts of which one was actually live on
+prod). Checked fresh directly against production's `schema_migrations` table:
+only `20260706052444` is present, and its `pg_get_functiondef` output matches
+the local file character-for-character. **`20260706052444` is the one true
+canonical version, confirmed live on prod.** Cleanup: deleted
+`20260706045911_fix_add_pantry_item_conversion_priority.sql`; repaired the
+local dev stack's phantom `20260706045911` bookkeeping row via
+`supabase migration repair --status reverted 20260706045911 --local` then
+`supabase migration up` (applied `20260706052444` locally, a no-op
+`CREATE OR REPLACE` since the body already matched); confirmed
+`npx supabase migration list --local` and the linked variant both show a
+clean 1:1 match for every `2026070*` version; re-ran `supabase test db` —
+`Files=7, Tests=28, Result: PASS`. `TODO.md` §2A and
+`supabase/CLAUDE.md` → "Resolved 2026-07-06 — duplicate `add_pantry_item`
+conversion-priority fix" both updated to match. §2A is now fully closed.
 
 **How to apply:** Before trusting any doc claim that a specific migration
-file exists locally, grep/`find` `main`'s working tree first — a claim in
-`TODO.md`/memory is not the same as a file being on disk *on the branch
-you're checking* (see [[project_pantry_rpc_overloads]] for the same lesson
-applied to overload assumptions). Similarly, don't trust a doc's claim about
-whether a fix reached production without checking `schema_migrations`
-directly — two notes here made opposite claims about the same fix and both
-can't be right. When using the MCP `apply_migration` tool for one-off prod
-fixes, create and commit the matching local migration file in the *same*
-change, and verify whether it registered a remote-tracked version via
+file exists locally, grep/`find` the working tree first — a claim in
+`TODO.md`/memory is not the same as a file being on disk (see
+[[project_pantry_rpc_overloads]] for the same lesson applied to overload
+assumptions). Similarly, don't trust a doc's claim about whether a fix
+reached production without checking `schema_migrations` directly — two
+notes here once made opposite claims about the same fix and only one could
+be right. When using the MCP `apply_migration` tool for one-off prod fixes,
+create and commit the matching local migration file in the *same* change,
+and verify whether it registered a remote-tracked version via
 `schema_migrations` — don't assume either way.
 
 Related: [[project_migration_sync]], [[project_pantry_rpc_overloads]],
