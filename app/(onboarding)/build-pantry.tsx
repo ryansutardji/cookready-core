@@ -51,7 +51,7 @@ const METER_SLOTS: MeterSlot[] = [
 
 type PantrySnapshot = { name: string; category: string }[];
 
-function computeMeterCounts(pantry: PantrySnapshot): Record<string, number> {
+export function computeMeterCounts(pantry: PantrySnapshot): Record<string, number> {
   const counts: Record<string, number> = {
     protein: 0, vegetable: 0, grain: 0, spice: 0, oil: 0, fruit: 0, baking: 0,
   };
