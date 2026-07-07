@@ -46,6 +46,7 @@ const queryBuilder = {} as {
   range: jest.Mock;
   match: jest.Mock;
   filter: jest.Mock;
+  or: jest.Mock;
   then: (
     resolve: (value: { data: unknown; error: unknown }) => unknown,
     reject?: (reason: unknown) => unknown,
@@ -69,6 +70,7 @@ const chainableMethods = [
   'range',
   'match',
   'filter',
+  'or',
 ] as const;
 
 for (const method of chainableMethods) {
