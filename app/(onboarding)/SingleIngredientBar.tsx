@@ -159,7 +159,7 @@ export function SingleIngredientBar({ onAdded }: { onAdded: () => void }) {
             <Text style={[singleStyles.unitText, { fontFamily: 'Inter_400Regular' }]}>{selectedUnit}</Text>
             <ChevronDown size={12} color="#4A3728" />
           </TouchableOpacity>
-          <TouchableOpacity style={[singleStyles.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
+          <TouchableOpacity testID="single-ingredient-save-button" style={[singleStyles.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
             {saving ? <ActivityIndicator size="small" color="#fff" /> : <Check size={15} color="#fff" strokeWidth={2.5} />}
           </TouchableOpacity>
         </View>

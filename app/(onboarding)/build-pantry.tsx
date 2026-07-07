@@ -401,6 +401,7 @@ function BundleTile({
               ))}
 
               <TouchableOpacity
+                testID="bundle-tile-add-button"
                 style={[tileStyles.addBtn, (checkedRows.length === 0 || saving) && tileStyles.addBtnDisabled]}
                 onPress={handleAdd}
                 disabled={checkedRows.length === 0 || saving}
@@ -693,6 +694,7 @@ export default function BuildPantryScreen() {
       {/* Fixed footer */}
       <View style={screenStyles.footer}>
         <TouchableOpacity
+          testID="build-pantry-continue-button"
           style={[screenStyles.continueBtn, requiredMet && screenStyles.continueBtnReady]}
           onPress={handleContinue}
           activeOpacity={0.85}

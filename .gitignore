@@ -36,6 +36,12 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # local notes
 publish_requirements.md
 TODO.md

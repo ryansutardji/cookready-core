@@ -441,6 +441,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
               </View>
 
               <TouchableOpacity
+                testID="smart-add-save-button"
                 style={[styles.saveBtn, saving && { opacity: 0.5 }]}
                 onPress={handleSave}
                 disabled={saving}

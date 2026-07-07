@@ -418,6 +418,7 @@ export function BundleSheet({ bundle, visible, onClose, onAdded }: Props) {
           {/* Add Button */}
           <View style={styles.footer}>
             <TouchableOpacity
+              testID="bundle-sheet-add-button"
               style={[
                 styles.addBtn,
                 (checkedRows.length === 0 || saving) && styles.addBtnDisabled,

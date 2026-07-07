@@ -169,6 +169,7 @@ export default function AuthScreen() {
           ) : null}
 
           <TouchableOpacity
+            testID="auth-submit-button"
             onPress={handleSubmit}
             disabled={isDisabled}
             style={[styles.submitButton, isDisabled && styles.submitButtonDisabled]}

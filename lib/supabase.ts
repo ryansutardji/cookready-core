@@ -6,7 +6,9 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 console.log('Targeting Supabase Project:', supabaseUrl);
 
-if (!supabaseUrl || !supabaseUrl.includes('nsunepmaywmmvvlbjwvc')) {
+const isLocalStack = supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost');
+
+if (!supabaseUrl || (!supabaseUrl.includes('nsunepmaywmmvvlbjwvc') && !isLocalStack)) {
   console.error('MISCONFIGURATION: Supabase URL is wrong or missing. Expected nsunepmaywmmvvlbjwvc, got:', supabaseUrl);
 }
 

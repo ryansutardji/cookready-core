@@ -11,10 +11,16 @@
     "test": "jest",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "test:db": "supabase test db"
+    "test:db": "supabase test db",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "jest": {
     "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/e2e/"
+    ],
     "transformIgnorePatterns": [
       "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|nativewind|react-native-css-interop))",
       "/node_modules/react-native-reanimated/plugin/"
@@ -68,6 +74,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-native": "^5.4.3",
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^29.5.14",
