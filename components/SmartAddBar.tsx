@@ -26,6 +26,7 @@ type Ingredient = {
   base_unit: string;
   preferred_unit: string;
   units: string[];
+  is_always_available: boolean;
 };
 
 type Props = {
@@ -78,7 +79,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
 
     let q = supabase
       .from('ingredients')
-      .select('id, name, category, base_unit, preferred_unit, user_id')
+      .select('id, name, category, base_unit, preferred_unit, user_id, is_always_available')
       .ilike('name', `%${text}%`)
       .order('name')
       .limit(8);
@@ -118,7 +119,7 @@ export function SmartAddBar({ onItemAdded }: Props) {
         const allUnits = Array.from(
           new Set([ing.preferred_unit, ing.base_unit, ...specificUnits, ...compatibleGlobalUnits])
         ).filter(Boolean);
-        return { ...ing, units: allUnits };
+        return { ...ing, units: allUnits, is_always_available: !!ing.is_always_available };
       });
 
       setResults(enriched);
@@ -366,23 +367,41 @@ export function SmartAddBar({ onItemAdded }: Props) {
 
             {showDropdown && (
               <ScrollView style={styles.dropdown} keyboardShouldPersistTaps="handled">
-                {results.map((ing, idx) => (
-                  <TouchableOpacity
-                    key={ing.id}
-                    style={[
-                      styles.dropdownItem,
-                      (idx < results.length - 1 || noResults) && styles.dropdownDivider,
-                    ]}
-                    onPress={() => handleSelect(ing)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.dropdownMain}>
-                      <Text style={styles.dropdownName}>{ing.name}</Text>
-                      <Text style={styles.dropdownCategory}>{ing.category}</Text>
-                    </View>
-                    <Text style={styles.dropdownUnits}>{ing.units.join(', ')}</Text>
-                  </TouchableOpacity>
-                ))}
+                {results.map((ing, idx) => {
+                  const isDivider = idx < results.length - 1 || noResults;
+                  if (ing.is_always_available) {
+                    return (
+                      <View
+                        key={ing.id}
+                        style={[
+                          styles.dropdownItem,
+                          styles.alwaysAvailableItem,
+                          isDivider && styles.dropdownDivider,
+                        ]}
+                      >
+                        <Text style={styles.alwaysAvailableName}>{ing.name}</Text>
+                        <View style={styles.alwaysAvailableBadge}>
+                          <Check size={11} color="#2D5A3D" strokeWidth={2.4} />
+                          <Text style={styles.alwaysAvailableBadgeText}>Always available</Text>
+                        </View>
+                      </View>
+                    );
+                  }
+                  return (
+                    <TouchableOpacity
+                      key={ing.id}
+                      style={[styles.dropdownItem, isDivider && styles.dropdownDivider]}
+                      onPress={() => handleSelect(ing)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.dropdownMain}>
+                        <Text style={styles.dropdownName}>{ing.name}</Text>
+                        <Text style={styles.dropdownCategory}>{ing.category}</Text>
+                      </View>
+                      <Text style={styles.dropdownUnits}>{ing.units.join(', ')}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
                 {noResults && query.trim().length > 0 && (
                   <>
                     {results.length === 0 && (
@@ -728,6 +747,33 @@ const styles = StyleSheet.create({
   dropdownUnits: {
     fontSize: 12,
     color: '#B8A898',
+    fontFamily: 'Inter_400Regular',
+  },
+  alwaysAvailableItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FBF7F1',
+  },
+  alwaysAvailableName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7A6558',
+    fontFamily: 'Inter_400Regular',
+  },
+  alwaysAvailableBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EBF5EE',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    gap: 4,
+  },
+  alwaysAvailableBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#2D5A3D',
     fontFamily: 'Inter_400Regular',
   },
   stepperRow: {

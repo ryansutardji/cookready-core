@@ -7,7 +7,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(3);
+select plan(4);
 
 select tests.create_test_user('11111111-1111-1111-1111-111111111111');
 select tests.create_test_user('99999999-9999-9999-9999-999999999999');
@@ -50,10 +50,28 @@ select results_eq(
   'get_recipe_ingredient_statuses reports available = false when the requirement exceeds pantry stock'
 );
 
--- ── Case 3: zero rows for a recipe not owned by the caller ──────────────────
+-- ── Case 3: available = true for an is_always_available staple (Water) with no pantry row ──
+-- Water is seeded globally with is_always_available = true
+-- (20260803060407_add_is_always_available_ingredient_flag.sql). No user_pantry
+-- row exists for it, but the RPC should short-circuit to available regardless.
 insert into public.saved_recipes (id, user_id, recipe_name, ingredients)
 values (
-  '44444444-4444-4444-4444-444444444443',
+  '44444444-4444-4444-4444-444444444444',
+  '11111111-1111-1111-1111-111111111111',
+  'Pgtap Test Rice Soup',
+  '[{"name":"Pgtap Test Rice","quantity":200,"unit":"g"},{"name":"Water","quantity":4,"unit":"cup"}]'::jsonb
+);
+
+select results_eq(
+  $$select ingredient_name, available from public.get_recipe_ingredient_statuses('44444444-4444-4444-4444-444444444444') order by ingredient_name$$,
+  $$values ('Pgtap Test Rice'::text, true), ('Water'::text, true)$$,
+  'get_recipe_ingredient_statuses reports available = true for an is_always_available staple (Water) with no pantry row'
+);
+
+-- ── Case 4: zero rows for a recipe not owned by the caller ──────────────────
+insert into public.saved_recipes (id, user_id, recipe_name, ingredients)
+values (
+  '44444444-4444-4444-4444-444444444445',
   '99999999-9999-9999-9999-999999999999',
   'Pgtap Test Other User Recipe',
   '[{"name":"Pgtap Test Rice","quantity":200,"unit":"g"}]'::jsonb
@@ -61,7 +79,7 @@ values (
 
 -- Still impersonating User A here.
 select is_empty(
-  $$select * from public.get_recipe_ingredient_statuses('44444444-4444-4444-4444-444444444443')$$,
+  $$select * from public.get_recipe_ingredient_statuses('44444444-4444-4444-4444-444444444445')$$,
   'get_recipe_ingredient_statuses returns zero rows (no exception) for a recipe owned by another user'
 );
 
