@@ -8,6 +8,10 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   workers: 1,
+  // Restores .env.local after the run so the local-stack override written by
+  // writeLocalEnvOverrideFile() (below) doesn't leak into the next
+  // `npx expo start` session — see e2e/global-teardown.ts.
+  globalTeardown: require.resolve('./e2e/global-teardown'),
   use: {
     baseURL: 'http://localhost:8082',
     trace: 'on-first-retry',

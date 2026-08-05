@@ -7,7 +7,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(3);
+select plan(4);
 
 select tests.create_test_user('11111111-1111-1111-1111-111111111111');
 select tests.create_test_user('99999999-9999-9999-9999-999999999999');
@@ -52,10 +52,28 @@ select is(
   'check_recipe_cookability returns false when an ingredient requires more than is stocked'
 );
 
--- ── Case 3: false for a recipe owned by a different user (ownership short-circuit) ──
+-- ── Case 3: true when an is_always_available staple (Water) has no pantry row ──
+-- Water is seeded globally with is_always_available = true
+-- (20260803060407_add_is_always_available_ingredient_flag.sql). No user_pantry
+-- row exists for it, but the RPC should short-circuit to available regardless.
 insert into public.saved_recipes (id, user_id, recipe_name, ingredients)
 values (
-  '44444444-4444-4444-4444-444444444443',
+  '44444444-4444-4444-4444-444444444444',
+  '11111111-1111-1111-1111-111111111111',
+  'Pgtap Test Rice Soup',
+  '[{"name":"Pgtap Test Rice","quantity":200,"unit":"g"},{"name":"Water","quantity":4,"unit":"cup"}]'::jsonb
+);
+
+select is(
+  public.check_recipe_cookability('44444444-4444-4444-4444-444444444444'),
+  true,
+  'check_recipe_cookability treats an is_always_available staple (Water) as available with no pantry row'
+);
+
+-- ── Case 4: false for a recipe owned by a different user (ownership short-circuit) ──
+insert into public.saved_recipes (id, user_id, recipe_name, ingredients)
+values (
+  '44444444-4444-4444-4444-444444444445',
   '99999999-9999-9999-9999-999999999999',
   'Pgtap Test Other User Recipe',
   '[{"name":"Pgtap Test Rice","quantity":200,"unit":"g"}]'::jsonb
@@ -63,7 +81,7 @@ values (
 
 -- Still impersonating User A here.
 select is(
-  public.check_recipe_cookability('44444444-4444-4444-4444-444444444443'),
+  public.check_recipe_cookability('44444444-4444-4444-4444-444444444445'),
   false,
   'check_recipe_cookability returns false (not an error) for a recipe owned by another user'
 );
