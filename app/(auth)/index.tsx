@@ -11,6 +11,7 @@ import {
   Image,
   StyleSheet,
 } from 'react-native';
+import { Eye, EyeOff } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { consumePendingLockout } from '@/lib/lockout-store';
 
@@ -41,6 +42,7 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -148,15 +150,30 @@ export default function AuthScreen() {
 
             <View style={styles.field}>
               <Text style={[styles.label, { fontFamily: 'Inter_400Regular' }]}>Password</Text>
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••••"
-                placeholderTextColor={PLACEHOLDER}
-                secureTextEntry
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                style={[styles.input, { fontFamily: 'Inter_400Regular' }]}
-              />
+              <View style={styles.passwordFieldWrap}>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor={PLACEHOLDER}
+                  secureTextEntry={!showPassword}
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  style={[styles.input, styles.passwordInput, { fontFamily: 'Inter_400Regular' }]}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword((prev) => !prev)}
+                  style={styles.passwordToggle}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff size={18} color={PLACEHOLDER} />
+                  ) : (
+                    <Eye size={18} color={PLACEHOLDER} />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
@@ -302,6 +319,19 @@ const styles = StyleSheet.create({
     color: ESPRESSO,
     borderWidth: 1,
     borderColor: BORDER,
+  },
+  passwordFieldWrap: {
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: 44, // leaves room for the eye toggle so text doesn't run under it
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 12,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorBox: {
     marginTop: 16,
