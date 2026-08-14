@@ -12,6 +12,7 @@ export type Message = {
 type Props = {
   message: Message;
   onPantryUpdate?: () => void;
+  hideCookButton?: boolean;
 };
 
 function tryParseRecipeJson(text: string): { off_topic?: boolean; recipes?: Recipe[] } | null {
@@ -28,7 +29,7 @@ function tryParseRecipeJson(text: string): { off_topic?: boolean; recipes?: Reci
   return null;
 }
 
-export function ChatMessage({ message, onPantryUpdate }: Props) {
+export function ChatMessage({ message, onPantryUpdate, hideCookButton }: Props) {
   const isUser = message.role === 'user';
 
   const parsedJson = !isUser ? tryParseRecipeJson(message.text) : null;
@@ -66,7 +67,7 @@ export function ChatMessage({ message, onPantryUpdate }: Props) {
       {!isUser && allRecipes.length > 0 && (
         <View style={styles.recipesContainer}>
           {allRecipes.map((recipe, idx) => (
-            <RecipeCard key={idx} recipe={recipe} onCooked={onPantryUpdate} />
+            <RecipeCard key={idx} recipe={recipe} onCooked={onPantryUpdate} hideCookButton={hideCookButton} />
           ))}
         </View>
       )}

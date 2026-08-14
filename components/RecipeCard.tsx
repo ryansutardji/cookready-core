@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 type Props = {
   recipe: Recipe;
   onCooked?: () => void;
+  hideCookButton?: boolean;
 };
 
 type CookState = 'idle' | 'cooking' | 'success' | 'error';
@@ -16,7 +17,7 @@ function formatQuantity(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-export function RecipeCard({ recipe, onCooked }: Props) {
+export function RecipeCard({ recipe, onCooked, hideCookButton = false }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [cookState, setCookState] = useState<CookState>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -156,29 +157,35 @@ export function RecipeCard({ recipe, onCooked }: Props) {
       </View>
 
       <View style={styles.actionRow}>
-        {cookState === 'success' ? (
-          <View style={styles.actionRowSuccess} />
-        ) : (
-          <TouchableOpacity
-            onPress={handleCookThis}
-            disabled={cookState === 'cooking'}
-            style={[styles.cookBtn, { opacity: cookState === 'cooking' ? 0.7 : 1 }]}
-          >
-            {cookState === 'cooking' ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <ChefHat size={16} color="#fff" />
-            )}
-            <Text style={[styles.cookBtnText, { fontFamily: 'Inter_400Regular' }]}>
-              {cookState === 'cooking' ? 'Updating pantry...' : 'Cook This'}
-            </Text>
-          </TouchableOpacity>
+        {!hideCookButton && (
+          cookState === 'success' ? (
+            <View style={styles.actionRowSuccess} />
+          ) : (
+            <TouchableOpacity
+              onPress={handleCookThis}
+              disabled={cookState === 'cooking'}
+              style={[styles.cookBtn, { opacity: cookState === 'cooking' ? 0.7 : 1 }]}
+            >
+              {cookState === 'cooking' ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <ChefHat size={16} color="#fff" />
+              )}
+              <Text style={[styles.cookBtnText, { fontFamily: 'Inter_400Regular' }]}>
+                {cookState === 'cooking' ? 'Updating pantry...' : 'Cook This'}
+              </Text>
+            </TouchableOpacity>
+          )
         )}
 
         <TouchableOpacity
           onPress={handleSave}
           disabled={saveState === 'saving' || saveState === 'saved'}
-          style={[styles.saveActionBtn, saveState === 'saved' && styles.saveActionBtnSaved]}
+          style={[
+            styles.saveActionBtn,
+            saveState === 'saved' && styles.saveActionBtnSaved,
+            hideCookButton && styles.saveActionBtnFull,
+          ]}
           activeOpacity={0.75}
         >
           {saveState === 'saving' ? (
@@ -388,6 +395,9 @@ const styles = StyleSheet.create({
   saveActionBtnSaved: {
     borderColor: '#708238',
     backgroundColor: 'rgba(112,130,56,0.08)',
+  },
+  saveActionBtnFull: {
+    flex: 1,
   },
   saveActionBtnText: {
     fontWeight: '700',
