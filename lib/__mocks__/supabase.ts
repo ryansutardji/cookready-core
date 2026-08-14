@@ -115,6 +115,17 @@ export const mockAuthOnAuthStateChange = jest.fn().mockReturnValue({
   data: { subscription: { unsubscribe: jest.fn() } },
 });
 
+// Real signatures (see node_modules/@supabase/auth-js GoTrueClient.d.ts):
+//   startAutoRefresh(): Promise<void>
+//   stopAutoRefresh(): Promise<void>
+// Both resolve with no value on success — mock that shape exactly.
+export const mockAuthStartAutoRefresh = jest.fn<Promise<void>, []>(() =>
+  Promise.resolve()
+);
+export const mockAuthStopAutoRefresh = jest.fn<Promise<void>, []>(() =>
+  Promise.resolve()
+);
+
 // ─── RPC ──────────────────────────────────────────────────────────────────────
 // Covers: add_pantry_item, deplete_pantry_item, apply_abuse_lockout,
 //         check_recipe_cookability, get_recipe_ingredient_statuses, delete_own_account
@@ -139,6 +150,8 @@ export const supabase = {
     signUp: mockAuthSignUp,
     signOut: mockAuthSignOut,
     onAuthStateChange: mockAuthOnAuthStateChange,
+    startAutoRefresh: mockAuthStartAutoRefresh,
+    stopAutoRefresh: mockAuthStopAutoRefresh,
   },
   rpc: mockRpc,
   functions: {

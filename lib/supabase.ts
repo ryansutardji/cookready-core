@@ -2,6 +2,7 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { authStorage } from './secure-store-adapter';
 
 const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -45,6 +46,12 @@ if (!supabaseUrl || (!supabaseUrl.includes('nsunepmaywmmvvlbjwvc') && !isLocalSt
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    ...(authStorage ? { storage: authStorage } : {}),
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+  },
   global: {
     fetch: (input, init) =>
       fetch(input, init).catch((err) => {

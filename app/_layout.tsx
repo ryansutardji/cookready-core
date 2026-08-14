@@ -11,11 +11,13 @@ import * as SplashScreen from 'expo-splash-screen';
 import { supabase } from '@/lib/supabase';
 import { setPendingLockout } from '@/lib/lockout-store';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import { useSupabaseAutoRefresh } from '@/hooks/useSupabaseAutoRefresh';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useFrameworkReady();
+  useSupabaseAutoRefresh();
   const router = useRouter(); // Use the hook inside the component
   const navigationState = useRootNavigationState();
 
