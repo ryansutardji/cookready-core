@@ -34,19 +34,19 @@ export default function WelcomeScreen() {
 
         {/* Headline */}
         <Text style={[styles.headline, { fontFamily: 'NotoSerif_700Bold' }]}>
-          Build your{'\n'}meal-ready pantry
+          Watch your{'\n'}AI Chef work
         </Text>
 
         <Text style={[styles.body, { fontFamily: 'Inter_400Regular' }]}>
-          Tell us what's in your kitchen and our AI Chef will turn it into real recipes — no grocery run required.
+          Give it a handful of pantry staples — eggs, rice, garlic, olive oil, salt — and watch it turn them into a real recipe in seconds.
         </Text>
 
         {/* Steps preview */}
         <View style={styles.steps}>
           {[
-            { icon: '📦', label: 'Stock your pantry with bundles or individual items' },
-            { icon: '🤖', label: 'AI Chef reads your pantry and suggests meals' },
-            { icon: '🍳', label: 'Cook and the app tracks what you use' },
+            { icon: '💬', label: 'Ask a question' },
+            { icon: '🍽️', label: 'AI Chef checks the sample kitchen' },
+            { icon: '📋', label: 'Get a real recipe back' },
           ].map((step, i) => (
             <View key={i} style={styles.stepRow}>
               <Text style={styles.stepIcon}>{step.icon}</Text>
@@ -60,17 +60,23 @@ export default function WelcomeScreen() {
       <Animated.View style={[styles.footer, { opacity: fadeAnim }]}>
         <TouchableOpacity
           style={styles.ctaBtn}
-          onPress={() => router.push('/(onboarding)/build-pantry')}
+          onPress={() => router.push('/(onboarding)/chef-demo')}
           activeOpacity={0.85}
         >
           <Text style={[styles.ctaBtnText, { fontFamily: 'Inter_400Regular' }]}>
-            Get Started
+            Watch the demo
           </Text>
           <ArrowRight size={18} color="#fff" />
         </TouchableOpacity>
-        <Text style={[styles.footerHint, { fontFamily: 'Inter_400Regular' }]}>
-          Takes about 2 minutes
-        </Text>
+        <TouchableOpacity
+          onPress={() => router.push('/(onboarding)/build-pantry')}
+          activeOpacity={0.6}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={[styles.skipText, { fontFamily: 'Inter_400Regular' }]}>
+            Skip — build my pantry now
+          </Text>
+        </TouchableOpacity>
       </Animated.View>
     </SafeAreaView>
   );
@@ -184,8 +190,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  footerHint: {
-    fontSize: 13,
-    color: '#A0856C',
+  skipText: {
+    fontSize: 14,
+    color: '#D2691E',
+    paddingVertical: 6,
   },
 });

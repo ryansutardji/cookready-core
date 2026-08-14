@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import type { PantryItem } from '@/lib/supabase';
 import { ChatMessage } from '@/components/ChatMessage';
 import type { Message } from '@/components/ChatMessage';
+import { ChatTypingIndicator } from '@/components/ChatTypingIndicator';
 import { RecipeLimitIndicator } from '@/components/RecipeLimitIndicator';
 
 function getResetTimeString(): string {
@@ -303,23 +303,7 @@ export default function ChefScreen() {
           <ChatMessage key={msg.id} message={msg} onPantryUpdate={refreshPantry} />
         ))}
 
-        {loading && (
-          <View style={styles.thinkingContainer}>
-            <View style={styles.thinkingAvatar}>
-              <View style={styles.thinkingAvatarInner}>
-                <Text style={styles.thinkingAvatarText}>🍳</Text>
-              </View>
-            </View>
-            <View style={styles.thinkingBubble}>
-              <ActivityIndicator size="small" color="#D2691E" />
-              <Text
-                style={[styles.thinkingText, { fontFamily: 'NotoSerif_700Bold' }]}
-              >
-                Thinking up something delicious...
-              </Text>
-            </View>
-          </View>
-        )}
+        {loading && <ChatTypingIndicator />}
       </ScrollView>
 
       {messages.length === 1 && !loading && (
@@ -515,44 +499,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 160,
-  },
-  thinkingContainer: {
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  thinkingAvatar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-    marginLeft: 4,
-  },
-  thinkingAvatarInner: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#D2691E',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thinkingAvatarText: {
-    color: '#fff',
-    fontSize: 12,
-  },
-  thinkingBubble: {
-    backgroundColor: '#F5EFE6',
-    borderRadius: 16,
-    borderTopLeftRadius: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  thinkingText: {
-    color: 'rgba(44,24,16,0.6)',
-    fontSize: 14,
-    fontStyle: 'italic',
   },
   suggestions: {
     flexGrow: 0,
