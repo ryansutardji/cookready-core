@@ -48,8 +48,11 @@ export async function waitForToast(page: Page, textOrPattern: string | RegExp) {
   await expect(page.getByText(textOrPattern)).toBeVisible();
 }
 
-export async function addIngredientViaSingleBar(page: Page, ingredientName: string) {
-  await page.getByPlaceholder('Search an ingredient...').fill(ingredientName);
+// `placeholder` must match the calling shelf's exact placeholder text, e.g.
+// "Search a protein…" — SingleIngredientBar's placeholder is per-shelf since
+// the pantry-onboarding wizard revamp (see app/(onboarding)/shelves/ShelfConfig.ts).
+export async function addIngredientViaSingleBar(page: Page, placeholder: string, ingredientName: string) {
+  await page.getByPlaceholder(placeholder).fill(ingredientName);
   await page.getByText(ingredientName, { exact: true }).click();
   await page.getByTestId('single-ingredient-save-button').click();
 }

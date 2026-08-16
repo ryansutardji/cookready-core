@@ -6,3 +6,4 @@
 - [Public Schema Grants Gap](project_public_schema_grants_gap.md) — FIXED 2026-07-05 via supabase/seed.sql grants (local/CI-only); hosted project already had grants, not a prod bug
 - [Unit Conversions NULL Ordering](project_unit_conversions_null_ordering.md) — add_pantry_item's NULL-ordering tiebreak bug: fixed + confirmed live on prod 2026-07-06 as migration 20260706052444, regression test in place
 - [Migration History Divergence](project_migration_history_divergence.md) — 8 migrations reconciled 2026-07-06; duplicate add_pantry_item migration file (20260706045911) deleted, 20260706052444 confirmed canonical/live on prod — TODO.md §2A fully closed
+- [Bundle Primary Category](project_bundle_primary_category.md) — bundles.primary_category (2026-08-14) is a purity flag, NULL unless 100% one category; feeds the pantry-wizard 5-shelf revamp filters, never backfill a "dominant" guess
