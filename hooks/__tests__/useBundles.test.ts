@@ -51,6 +51,7 @@ describe('useBundles', () => {
       color: '#FF5733',
       sort_order: 0,
       created_at: '2026-01-01T00:00:00.000Z',
+      primary_category: null,
       bundle_ingredients: [
         {
           default_unit: 'oz',
@@ -81,6 +82,7 @@ describe('useBundles', () => {
     expect(bundle.tag).toBe(rawRow.tag);
     expect(bundle.icon).toBe(rawRow.icon);
     expect(bundle.color).toBe(rawRow.color);
+    expect(bundle.primaryCategory).toBeNull();
 
     expect(bundle.ingredients).toEqual([
       { ingredientId: 'ing-beef', name: 'Ground Beef', defaultUnit: 'lb' },
@@ -111,5 +113,83 @@ describe('useBundles', () => {
     expect(result.current.bundles).toEqual([]);
     expect(result.current.error).toBe('some db error');
     expect(result.current.loading).toBe(false);
+  });
+
+  it('maps primary_category through to primaryCategory on the returned Bundle', async () => {
+    mockQueryResult.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'bundle-2',
+          name: 'Protein Basics',
+          description: 'Pure protein bundle',
+          tag: 'Protein',
+          icon: 'drumstick',
+          color: '#AA5533',
+          sort_order: 0,
+          primary_category: 'Protein',
+          bundle_ingredients: [],
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = renderHook(() => useBundles());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.bundles[0].primaryCategory).toBe('Protein');
+  });
+
+  it('applies no primary_category filter by default (existing unfiltered behavior)', async () => {
+    mockQueryResult.mockResolvedValueOnce({ data: [], error: null });
+
+    const { result } = renderHook(() => useBundles());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const builder = mockFrom.mock.results[0].value;
+    expect(builder.eq).not.toHaveBeenCalled();
+    expect(builder.in).not.toHaveBeenCalled();
+  });
+
+  it('filters by a single primaryCategory string using .eq', async () => {
+    mockQueryResult.mockResolvedValueOnce({ data: [], error: null });
+
+    const { result } = renderHook(() => useBundles({ primaryCategory: 'Protein' }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // The shared queryBuilder singleton's .eq/.in call history persists
+    // across tests in this file (only mockFrom/mockQueryResult are cleared
+    // in afterEach — see the comment there), so assert on the most recent
+    // call rather than "not called at all".
+    const builder = mockFrom.mock.results[0].value;
+    expect(builder.eq).toHaveBeenLastCalledWith('primary_category', 'Protein');
+  });
+
+  it('filters by multiple primaryCategory values using .in', async () => {
+    mockQueryResult.mockResolvedValueOnce({ data: [], error: null });
+
+    const { result } = renderHook(() => useBundles({ primaryCategory: ['Oil', 'Fat'] }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const builder = mockFrom.mock.results[0].value;
+    expect(builder.in).toHaveBeenLastCalledWith('primary_category', ['Oil', 'Fat']);
+  });
+
+  it('does not refetch when a new but value-equal categories array is passed on rerender', async () => {
+    mockQueryResult.mockResolvedValueOnce({ data: [], error: null });
+
+    const { result, rerender } = renderHook(
+      ({ options }: { options: { primaryCategory: string[] } }) => useBundles(options),
+      { initialProps: { options: { primaryCategory: ['Oil', 'Fat'] } } }
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mockQueryResult).toHaveBeenCalledTimes(1);
+
+    // A fresh array reference with the same values (e.g. an inline array
+    // literal recomputed on every parent render) must not retrigger the fetch.
+    rerender({ options: { primaryCategory: ['Oil', 'Fat'] } });
+
+    expect(mockQueryResult).toHaveBeenCalledTimes(1);
   });
 });

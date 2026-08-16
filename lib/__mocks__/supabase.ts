@@ -35,6 +35,7 @@ const queryBuilder = {} as {
   neq: jest.Mock;
   in: jest.Mock;
   is: jest.Mock;
+  ilike: jest.Mock;
   gt: jest.Mock;
   gte: jest.Mock;
   lt: jest.Mock;
@@ -59,6 +60,7 @@ const chainableMethods = [
   'neq',
   'in',
   'is',
+  'ilike',
   'gt',
   'gte',
   'lt',

@@ -10,8 +10,9 @@ import {
   Modal,
   Platform,
 } from 'react-native';
-import { Check, ChevronDown, X } from 'lucide-react-native';
+import { Check, ChevronDown, X, Sparkles } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { NewIngredientExpansion } from '@/components/NewIngredientExpansion';
 
 // ---------------------------------------------------------------------------
 // Sub-component: Inline Single Ingredient Bar
@@ -25,22 +26,51 @@ type SearchIngredient = {
   units: string[];
 };
 
-export function SingleIngredientBar({ onAdded }: { onAdded: () => void }) {
+type Props = {
+  onAdded: () => void;
+  categories: string[];
+  placeholder: string;
+  lockedCategory?: string;
+};
+
+// Friendly lowercase labels for the "Add as new ___" row — not a plain
+// .toLowerCase() since a couple of DB category values read awkwardly as-is.
+const CATEGORY_LABELS: Record<string, string> = {
+  Protein: 'protein',
+  Vegetable: 'vegetable',
+  Fruit: 'fruit',
+  Grain: 'grain',
+  Oil: 'oil',
+  Fat: 'fat',
+  Dairy: 'dairy',
+  Baking: 'baking ingredient',
+  'Spice/Sauce': 'spice or sauce',
+  Pantry: 'pantry item',
+};
+
+export function SingleIngredientBar({ onAdded, categories, placeholder, lockedCategory }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchIngredient[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [noResults, setNoResults] = useState(false);
   const [selected, setSelected] = useState<SearchIngredient | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedUnit, setSelectedUnit] = useState('');
   const [showUnitPicker, setShowUnitPicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showNewIngredient, setShowNewIngredient] = useState(false);
+
+  const newIngredientLabel = lockedCategory
+    ? (CATEGORY_LABELS[lockedCategory] ?? lockedCategory)
+    : 'ingredient';
 
   const searchIngredients = useCallback(async (text: string) => {
-    if (!text.trim()) { setResults([]); setShowDropdown(false); return; }
+    if (!text.trim()) { setResults([]); setShowDropdown(false); setNoResults(false); return; }
     const { data } = await supabase
       .from('ingredients')
       .select('id, name, category, base_unit, preferred_unit')
       .ilike('name', `%${text}%`)
+      .in('category', categories)
       .order('name')
       .limit(8);
 
@@ -65,11 +95,14 @@ export function SingleIngredientBar({ onAdded }: { onAdded: () => void }) {
         return { ...ing, units: allUnits };
       });
       setResults(enriched);
+      setNoResults(false);
       setShowDropdown(true);
     } else {
-      setResults([]); setShowDropdown(false);
+      setResults([]);
+      setNoResults(true);
+      setShowDropdown(true);
     }
-  }, []);
+  }, [categories]);
 
   useEffect(() => {
     if (selected) return;
@@ -87,7 +120,9 @@ export function SingleIngredientBar({ onAdded }: { onAdded: () => void }) {
 
   function handleClear() {
     setSelected(null); setQuery(''); setResults([]); setShowDropdown(false);
+    setNoResults(false);
     setQuantity(1); setSelectedUnit('');
+    setShowNewIngredient(false);
   }
 
   async function handleSave() {
@@ -107,45 +142,123 @@ export function SingleIngredientBar({ onAdded }: { onAdded: () => void }) {
     }
   }
 
+  async function handleSaveNewIngredient(ingredient: {
+    name: string;
+    category: string;
+    preferred_unit: string;
+    base_unit: string;
+    conversion_value: number | null;
+    conversion_to_unit: string | null;
+  }) {
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: newIng, error: ingError } = await supabase
+        .from('ingredients')
+        .insert({
+          name: ingredient.name,
+          category: ingredient.category,
+          preferred_unit: ingredient.preferred_unit,
+          base_unit: ingredient.base_unit,
+          user_id: user?.id,
+        })
+        .select('id')
+        .single();
+
+      if (ingError) throw ingError;
+
+      if (ingredient.conversion_value != null && ingredient.conversion_to_unit) {
+        const toUnit = ingredient.conversion_to_unit === 'count' ? 'each' : ingredient.conversion_to_unit;
+        await supabase.from('unit_conversions').insert({
+          ingredient_id: newIng.id,
+          input_unit: ingredient.preferred_unit,
+          output_value: ingredient.conversion_value,
+          output_unit: toUnit,
+        });
+      }
+
+      const { error: rpcError } = await supabase.rpc('add_pantry_item', {
+        p_ingredient_name: ingredient.name,
+        p_quantity: 1,
+        p_unit: ingredient.preferred_unit,
+      });
+      if (rpcError) throw rpcError;
+
+      handleClear();
+      onAdded();
+    } catch (err: any) {
+      console.error('Failed to save new ingredient:', err?.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <View style={singleStyles.wrapper}>
-      {!selected ? (
+      {!selected && !showNewIngredient ? (
         <>
           <View style={singleStyles.searchRow}>
             <TextInput
               style={[singleStyles.input, { fontFamily: 'Inter_400Regular' }]}
-              placeholder="Search an ingredient..."
+              placeholder={placeholder}
               placeholderTextColor="#B8A898"
               value={query}
               onChangeText={setQuery}
               returnKeyType="search"
             />
           </View>
-          {showDropdown && results.length > 0 && (
+          {showDropdown && (
             <ScrollView style={singleStyles.dropdown} keyboardShouldPersistTaps="handled">
-              {results.map((ing, idx) => (
-                <TouchableOpacity
-                  key={ing.id}
-                  style={[singleStyles.dropdownItem, idx < results.length - 1 && singleStyles.dropdownDivider]}
-                  onPress={() => handleSelect(ing)}
-                  activeOpacity={0.7}
-                >
-                  <View style={singleStyles.dropdownMain}>
-                    <Text style={[singleStyles.dropdownName, { fontFamily: 'Inter_400Regular' }]}>{ing.name}</Text>
-                    <Text style={[singleStyles.dropdownCat, { fontFamily: 'Inter_400Regular' }]}>{ing.category}</Text>
-                  </View>
-                  <Text style={[singleStyles.dropdownUnits, { fontFamily: 'Inter_400Regular' }]}>{ing.units.slice(0, 3).join(', ')}</Text>
-                </TouchableOpacity>
-              ))}
+              {results.map((ing, idx) => {
+                const isDivider = idx < results.length - 1 || noResults;
+                return (
+                  <TouchableOpacity
+                    key={ing.id}
+                    style={[singleStyles.dropdownItem, isDivider && singleStyles.dropdownDivider]}
+                    onPress={() => handleSelect(ing)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={singleStyles.dropdownMain}>
+                      <Text style={[singleStyles.dropdownName, { fontFamily: 'Inter_400Regular' }]}>{ing.name}</Text>
+                      <Text style={[singleStyles.dropdownCat, { fontFamily: 'Inter_400Regular' }]}>{ing.category}</Text>
+                    </View>
+                    <Text style={[singleStyles.dropdownUnits, { fontFamily: 'Inter_400Regular' }]}>{ing.units.slice(0, 3).join(', ')}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {noResults && query.trim().length > 0 && (
+                <>
+                  {results.length === 0 && (
+                    <View style={singleStyles.noResultsRow}>
+                      <Text style={[singleStyles.noResultsText, { fontFamily: 'Inter_400Regular' }]}>No matches found</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={singleStyles.addNewRow}
+                    onPress={() => setShowNewIngredient(true)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={singleStyles.addNewIcon}>
+                      <Sparkles size={13} color="#D2691E" strokeWidth={2} />
+                    </View>
+                    <View style={singleStyles.addNewTextWrap}>
+                      <Text style={[singleStyles.addNewLabel, { fontFamily: 'Inter_400Regular' }]}>
+                        Add "{query.trim()}" as a new {newIngredientLabel}
+                      </Text>
+                    </View>
+                    <Text style={singleStyles.addNewChevron}>›</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </ScrollView>
           )}
         </>
-      ) : (
+      ) : !showNewIngredient ? (
         <View style={singleStyles.stepperRow}>
           <TouchableOpacity onPress={handleClear} style={singleStyles.clearBtn}>
             <X size={13} color="#8C6A5A" />
           </TouchableOpacity>
-          <Text style={[singleStyles.selectedName, { fontFamily: 'Inter_400Regular' }]} numberOfLines={1}>{selected.name}</Text>
+          <Text style={[singleStyles.selectedName, { fontFamily: 'Inter_400Regular' }]} numberOfLines={1}>{selected!.name}</Text>
           <View style={singleStyles.stepperControls}>
             <TouchableOpacity style={singleStyles.stepBtn} onPress={() => setQuantity((q) => Math.max(1, q - 1))}>
               <Text style={singleStyles.stepBtnText}>−</Text>
@@ -163,6 +276,14 @@ export function SingleIngredientBar({ onAdded }: { onAdded: () => void }) {
             {saving ? <ActivityIndicator size="small" color="#fff" /> : <Check size={15} color="#fff" strokeWidth={2.5} />}
           </TouchableOpacity>
         </View>
+      ) : (
+        <NewIngredientExpansion
+          ingredientName={query.trim()}
+          lockedCategory={lockedCategory}
+          saving={saving}
+          onCancel={() => setShowNewIngredient(false)}
+          onSave={handleSaveNewIngredient}
+        />
       )}
 
       <Modal visible={showUnitPicker} transparent animationType="fade" onRequestClose={() => setShowUnitPicker(false)}>
@@ -219,6 +340,49 @@ const singleStyles = StyleSheet.create({
   dropdownName: { fontSize: 14, color: '#2C1810', fontWeight: '600' },
   dropdownCat: { fontSize: 12, color: '#9C7B6A' },
   dropdownUnits: { fontSize: 12, color: '#B8A898' },
+  noResultsRow: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  noResultsText: {
+    fontSize: 12,
+    color: '#B8A898',
+  },
+  addNewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    gap: 10,
+  },
+  addNewIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FDF0E4',
+    borderWidth: 1,
+    borderColor: '#F0D5B5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addNewTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  addNewLabel: {
+    fontSize: 13,
+    color: '#2C1810',
+    fontWeight: '600',
+  },
+  addNewHint: {
+    fontSize: 11,
+    color: '#9C7B6A',
+  },
+  addNewChevron: {
+    fontSize: 18,
+    color: '#D2691E',
+    fontWeight: '600',
+  },
   stepperRow: {
     flexDirection: 'row',
     alignItems: 'center',

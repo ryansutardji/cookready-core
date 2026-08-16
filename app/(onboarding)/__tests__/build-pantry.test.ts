@@ -10,7 +10,7 @@ jest.mock('@/lib/supabase', () => ({
   },
 }));
 
-import { computeMeterCounts } from '../build-pantry';
+import { computeMeterCounts, groupPantryNamesBySlot } from '../build-pantry';
 
 describe('computeMeterCounts', () => {
   it('returns all zeros for an empty pantry', () => {
@@ -118,5 +118,66 @@ describe('computeMeterCounts', () => {
     const counts = computeMeterCounts(pantry);
 
     expect(counts.spice).toBe(7);
+  });
+});
+
+describe('groupPantryNamesBySlot', () => {
+  it('returns all-empty arrays for all 7 slot keys when the pantry is empty', () => {
+    const names = groupPantryNamesBySlot([]);
+
+    expect(names).toEqual({
+      protein: [],
+      vegetable: [],
+      grain: [],
+      spice: [],
+      oil: [],
+      fruit: [],
+      baking: [],
+    });
+  });
+
+  it('buckets an item into its matching slot key by name', () => {
+    const names = groupPantryNamesBySlot([{ name: 'Chicken', category: 'Protein' }]);
+
+    expect(names.protein).toEqual(['Chicken']);
+    expect(names.vegetable).toEqual([]);
+  });
+
+  it('buckets multiple items of the same category into the same slot array, preserving input order', () => {
+    const names = groupPantryNamesBySlot([
+      { name: 'Salt', category: 'Spice/Sauce' },
+      { name: 'Pepper', category: 'Spice/Sauce' },
+      { name: 'Cumin', category: 'Spice/Sauce' },
+    ]);
+
+    expect(names.spice).toEqual(['Salt', 'Pepper', 'Cumin']);
+  });
+
+  it('buckets both Oil and Fat categories into the shared oil slot', () => {
+    const names = groupPantryNamesBySlot([
+      { name: 'Olive Oil', category: 'Oil' },
+      { name: 'Butter', category: 'Fat' },
+    ]);
+
+    expect(names.oil).toEqual(['Olive Oil', 'Butter']);
+  });
+
+  it('silently drops an item whose category matches no slot, matching computeMeterCounts behavior', () => {
+    const pantry = [
+      { name: 'Milk', category: 'Dairy' },
+      { name: 'Soda', category: 'Beverage' },
+    ];
+
+    const names = groupPantryNamesBySlot(pantry);
+
+    expect(names).toEqual({
+      protein: [],
+      vegetable: [],
+      grain: [],
+      spice: [],
+      oil: [],
+      fruit: [],
+      baking: [],
+    });
   });
 });

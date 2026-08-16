@@ -68,6 +68,7 @@ async function fetchUnitsByCategory(): Promise<Record<string, string[]>> {
 
 type Props = {
   ingredientName: string;
+  lockedCategory?: string;
   onSave: (ingredient: {
     name: string;
     category: string;
@@ -80,7 +81,7 @@ type Props = {
   saving: boolean;
 };
 
-export function NewIngredientExpansion({ ingredientName, onSave, onCancel, saving }: Props) {
+export function NewIngredientExpansion({ ingredientName, lockedCategory, onSave, onCancel, saving }: Props) {
   const [classifying, setClassifying] = useState(true);
   const [classifyError, setClassifyError] = useState('');
 
@@ -108,6 +109,24 @@ export function NewIngredientExpansion({ ingredientName, onSave, onCancel, savin
     setClassifying(true);
     setClassifyError('');
     try {
+      if (lockedCategory) {
+        const categoryUnits = await fetchUnitsByCategory();
+        setUnitsByCategory(categoryUnits);
+        const catUnits = categoryUnits[lockedCategory] ?? [];
+        setSelectedCategory(lockedCategory as Category);
+        setAvailableUnits(catUnits);
+        // There's no AI suggestion to steer this pick (that's the whole point
+        // of the locked-category path), so prefer a universal unit — one that
+        // already has a global conversion row and needs no extra "how does 1
+        // X measure?" step — over whatever happens to sort first
+        // alphabetically (e.g. "bag" before "lb"), which would otherwise
+        // silently strand the user behind an unresolved conversion prompt
+        // with no value ever supplied.
+        const preferredUnit = catUnits.find((u) => UNIVERSAL_UNITS.has(u)) ?? catUnits[0] ?? '';
+        setSelectedUnit(preferredUnit);
+        return;
+      }
+
       const [categoryUnits, session] = await Promise.all([
         fetchUnitsByCategory(),
         supabase.auth.getSession().then(r => r.data.session),
@@ -132,7 +151,7 @@ export function NewIngredientExpansion({ ingredientName, onSave, onCancel, savin
         ? (result.category as Category)
         : 'Pantry';
 
-      const catUnits = categoryUnits[cat] ?? allUnits;
+      const catUnits = categoryUnits[cat] ?? [];
       setSelectedCategory(cat);
       setAiSuggestedCategory(cat);
       setAvailableUnits(catUnits);
@@ -254,27 +273,33 @@ export function NewIngredientExpansion({ ingredientName, onSave, onCancel, savin
               </View>
             ) : null}
           </View>
-          <View style={styles.pillRow}>
-            {CATEGORIES.map((cat) => {
-              const active = cat === selectedCategory;
-              const isAi = cat === aiSuggestedCategory;
-              return (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.pill, active && styles.pillActive]}
-                  onPress={() => handleCategorySelect(cat)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.pillText, active && styles.pillTextActive]}>
-                    {cat}
-                  </Text>
-                  {active && isAi && (
-                    <View style={styles.aiDot} />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          {lockedCategory ? (
+            <View style={styles.lockedCategoryBadge}>
+              <Text style={styles.lockedCategoryBadgeText}>{lockedCategory}</Text>
+            </View>
+          ) : (
+            <View style={styles.pillRow}>
+              {CATEGORIES.map((cat) => {
+                const active = cat === selectedCategory;
+                const isAi = cat === aiSuggestedCategory;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.pill, active && styles.pillActive]}
+                    onPress={() => handleCategorySelect(cat)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.pillText, active && styles.pillTextActive]}>
+                      {cat}
+                    </Text>
+                    {active && isAi && (
+                      <View style={styles.aiDot} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           {/* Unit */}
           <View style={[styles.sectionHeader, { marginTop: 14 }]}>
@@ -520,6 +545,19 @@ const styles = StyleSheet.create({
   },
   pillTextActive: {
     color: '#fff',
+    fontWeight: '600',
+  },
+  lockedCategoryBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#D2691E',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  lockedCategoryBadgeText: {
+    fontSize: 13,
+    color: '#fff',
+    fontFamily: 'Inter_400Regular',
     fontWeight: '600',
   },
   aiDot: {
